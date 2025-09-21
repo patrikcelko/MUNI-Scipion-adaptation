@@ -1,0 +1,6 @@
+apiVersion: v2
+name: scipion3-remote
+description: Scipion3 with 3D acceleration and remote access using web interface
+type: application
+version: 0.3.4
+appVersion: "3.x"

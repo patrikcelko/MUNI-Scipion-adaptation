@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Run Scipion3 with VirtualGL
+set -euo pipefail
+VGLD="${VGL_DEVICE:-/dev/dri/card0}"
+
+exec vglrun -d "${VGLD}" "${SCIPION_HOME}/scipion3" "$@"

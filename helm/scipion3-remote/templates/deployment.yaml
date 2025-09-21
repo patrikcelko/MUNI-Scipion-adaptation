@@ -1,0 +1,83 @@
+{{- $appName := default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- $fullname := printf "%s-%s" .Release.Name $appName | trunc 63 | trimSuffix "-" -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    app.kubernetes.io/name: {{ $appName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $appName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $appName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName | quote }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: scipion
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            fsGroupChangePolicy: OnRootMismatch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+          env:
+            - name: VNC_DISPLAY
+              value: "{{ .Values.vnc.display }}"
+            - name: VNC_GEOMETRY
+              value: "{{ .Values.vnc.geometry }}"
+            - name: VNC_DEPTH
+              value: "{{ .Values.vnc.depth }}"
+          envFrom:
+            - secretRef:
+                name: "scipion-vnc"
+          ports:
+            - name: novnc
+              containerPort: {{ add 5800 (int .Values.vnc.display) }}
+            - name: rfb
+              containerPort: {{ add 5900 (int .Values.vnc.display) }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              subPath: data
+            - name: data
+              mountPath: /projects
+              subPath: projects
+          resources:
+            limits:
+              nvidia.com/gpu: 1  # TODO: Make dynamic
+              cpu: {{ default "4" .Values.resources.limits.cpu | quote }}
+              memory: {{ default "8Gi" .Values.resources.limits.memory | quote }}
+            requests:
+              cpu: {{ default "2" .Values.resources.requests.cpu | quote }}
+              memory: {{ default "4Gi" .Values.resources.requests.memory | quote }}
+          readinessProbe:
+            httpGet: { path: "/", port: novnc }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: "/", port: novnc }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-data" $fullname) .Values.persistence.existingClaim }}
