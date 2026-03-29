@@ -118,7 +118,7 @@ start_websockify() {
 cleanup() {
   log "Shutting down..."
   vncserver -kill ":${VNC_DISPLAY}" >/dev/null 2>&1 || true
-  [ -n "${WSPID:-}" ] && kill "${WSPID}" >/dev/null 2>&1 || true
+  if [ -n "${WSPID:-}" ]; then kill "${WSPID}" >/dev/null 2>&1 || true; fi
   # Terminate remaining child processes (Scipion GUI, Task Monitor, etc.)
   local child
   for child in $(jobs -p 2>/dev/null); do

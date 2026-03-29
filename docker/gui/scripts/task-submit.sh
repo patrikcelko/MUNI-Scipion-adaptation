@@ -45,7 +45,7 @@ http_request() {
 }
 
 debug() {
-  [[ "${TASK_SUBMIT_DEBUG:-0}" == "1" ]] && echo "[DEBUG] $*" >&2 || true;
+  if [[ "${TASK_SUBMIT_DEBUG:-0}" == "1" ]]; then echo "[DEBUG] $*" >&2; fi
 }
 
 # Escape a string for safe embedding in a JSON value.
