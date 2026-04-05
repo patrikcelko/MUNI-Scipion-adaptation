@@ -43,7 +43,6 @@ class DispatcherBackend(InfraBackend):
         # task_id -> dispatcher task mapping (local memory)
         self._tasks: dict[str, str] = {}
 
-
     def _request(
         self,
         method: str,
@@ -88,7 +87,6 @@ class DispatcherBackend(InfraBackend):
             raise BackendError(
                 f'Dispatcher unreachable: {exc.reason}', status_code=502
             ) from exc
-
 
     def submit_job(
         self,
@@ -226,7 +224,6 @@ class DispatcherBackend(InfraBackend):
         if task_id:
             logger.info('Removed Dispatcher task %s for job %s', task_id, job_name)
 
-
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         """Dispatcher backend has no pod-level visibility."""
 
@@ -270,7 +267,6 @@ class DispatcherBackend(InfraBackend):
 
         return ''
 
-
     def list_node_images(self) -> list[dict[str, Any]]:
         """Dispatcher backend has no node image visibility."""
 
@@ -283,7 +279,6 @@ class DispatcherBackend(InfraBackend):
             'Pod deletion not supported via Dispatcher backend',
             status_code=501,
         )
-
 
     def cleanup_once(
         self,
