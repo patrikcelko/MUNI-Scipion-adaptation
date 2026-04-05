@@ -124,3 +124,6 @@ marimo/_lsp/
 __marimo__/
 
 coverage
+
+docs/
+*.md
