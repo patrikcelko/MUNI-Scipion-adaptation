@@ -1,0 +1,60 @@
+onedata:
+  enabled: false
+  image: onedata/oneclient:21.02.4
+  provider: ""
+  space: ""
+  tokenSecret: ""
+  extraArgs: []
+
+image:
+  repository: harbor.celko.cz/scipion-adaptation/scipion3-remote
+  tag: v3
+  pullPolicy: IfNotPresent
+
+gpu:
+  enabled: false
+
+resources:
+  requests:
+    cpu: "1"
+    memory: "4Gi"
+  limits:
+    cpu: "2"
+    memory: "8Gi"
+
+vnc:
+  display: 1
+  geometry: "1920x1080"
+  depth: 24
+  # NOTE: Supply the password via --set vnc.password=<value> or an external secret
+  password: ""
+  secretName: ""
+
+ingress:
+  enabled: true
+  className: public
+  host: ""  # NOTE: Match any possible host, if needed specify per node
+  tls:
+    enabled: false  # TLS for internal network not needed
+    secretName: ""
+  annotations: {}
+
+service:
+  type: NodePort
+  port: 80
+  nodePort: 31335
+
+persistence:
+  enabled: true
+  size: 10Gi
+  accessMode: ReadWriteOnce
+  storageClassName: microk8s-hostpath
+  existingClaim: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Enable with: helm install -f values-controller.yaml ...
+controller:
+  enabled: false

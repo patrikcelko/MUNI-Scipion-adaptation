@@ -1,0 +1,22 @@
+{{- $ctl := .Values.controller | default dict -}}
+{{- if and (kindIs "map" $ctl) ($ctl.enabled | default false) }}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: scipion-controller
+  labels:
+{{ include "scipion3-remote.labels" . | indent 4 }}
+spec:
+  type: {{ $ctl.service.type }}
+  selector:
+    app.kubernetes.io/name: scipion-controller
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+  - name: http
+    port: {{ $ctl.service.port }}
+    targetPort: 5000
+{{- if and (eq $ctl.service.type "NodePort") ($ctl.service.nodePort | default false) }}
+    nodePort: {{ $ctl.service.nodePort }}
+{{- end }}
+{{- end }}

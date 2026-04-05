@@ -1,0 +1,14 @@
+{{- $ctl := .Values.controller | default dict -}}
+{{- if and (kindIs "map" $ctl) ($ctl.enabled | default false) }}
+{{- $tools := ($ctl.tools | default (list)) -}}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scipion-controller-config
+  labels:
+{{ include "scipion3-remote.labels" . | indent 4 }}
+data:
+  tools.yaml: |
+{{ toYaml $tools | indent 4 }}
+{{- end }}

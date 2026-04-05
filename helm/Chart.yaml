@@ -1,0 +1,6 @@
+apiVersion: v2
+name: scipion3-remote
+description: Scipion3 with 3D acceleration and remote access using web interface, ability to connect to onedata and jobs splitting
+type: application
+version: 0.7.0
+appVersion: "3.x"

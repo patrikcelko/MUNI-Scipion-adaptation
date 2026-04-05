@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "scipion3-remote.fullname" . }}
+  labels:
+{{ include "scipion3-remote.labels" . | indent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+{{ include "scipion3-remote.selectorLabels" . | indent 6 }}
+  template:
+    metadata:
+      labels:
+{{ include "scipion3-remote.selectorLabels" . | indent 8 }}
+    spec:
+      {{- if .Values.gpu.runtimeClassName }}
+      runtimeClassName: {{ .Values.gpu.runtimeClassName | quote }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: scipion
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: novnc
+              containerPort: 5801
+            - name: vnc
+              containerPort: 5901
+          env:
+            - name: VNC_DISPLAY
+              value: {{ .Values.vnc.display | quote }}
+            - name: VNC_GEOMETRY
+              value: {{ .Values.vnc.geometry | quote }}
+            - name: VNC_DEPTH
+              value: {{ .Values.vnc.depth | quote }}
+{{- if or .Values.vnc.password .Values.vnc.secretName }}
+          envFrom:
+            - secretRef:
+                name: {{ default (printf "%s-vnc" (include "scipion3-remote.fullname" .)) .Values.vnc.secretName }}
+{{- end }}
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+              {{- if .Values.gpu.enabled }}
+              nvidia.com/gpu: {{ default "1" .Values.gpu.count | quote }}
+              {{- end }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+              {{- if .Values.gpu.enabled }}
+              nvidia.com/gpu: {{ default "1" .Values.gpu.count | quote }}
+              {{- end }}
+          readinessProbe:
+            httpGet: { path: "/", port: novnc }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: "/", port: novnc }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /projects
+              subPath: projects
+            - name: data
+              mountPath: /data
+              subPath: data
+{{- if .Values.onedata.enabled }}
+            - name: onedata-mnt
+              mountPath: /onedata
+{{- end }}
+
+{{- if .Values.onedata.enabled }}
+        - name: onedata
+          image: "{{ .Values.onedata.image }}"
+          args:
+            - "--provider={{ .Values.onedata.provider }}"
+            - "--space={{ .Values.onedata.space }}"
+{{- range .Values.onedata.extraArgs }}
+            - "{{ . }}"
+{{- end }}
+          env:
+            - name: ONECLIENT_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.onedata.tokenSecret }}"
+                  key: TOKEN
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+          volumeMounts:
+            - name: onedata-mnt
+              mountPath: /onedata
+              mountPropagation: Bidirectional
+{{- end }}
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-data" (include "scipion3-remote.fullname" .)) .Values.persistence.existingClaim }}
+{{- if .Values.onedata.enabled }}
+        - name: onedata-mnt
+          emptyDir: {}
+{{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

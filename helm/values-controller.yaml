@@ -1,0 +1,58 @@
+controller:
+  enabled: true
+  image:
+    repository: harbor.celko.cz/scipion-adaptation/scipion-k8s-controller
+    tag: v11
+    pullPolicy: IfNotPresent
+
+  service:
+    type: NodePort
+    port: 5000
+    nodePort: 30080
+
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "1",    memory: "512Mi" }
+
+  storageMode: "pvc"
+  projectsPVC: "scipion-scipion3-remote-data"
+  localPath: "/srv/scipion/projects"
+  jobsTTL: 600
+  jobsCleanupInterval: 120
+
+  onedata:
+    enabled: false
+    image: ""
+    provider: ""
+    space: ""
+    tokenSecret: ""
+    extraArgs: []
+
+  nodeSelectorJson: {}
+  tolerationsJson: {}
+
+  tools:
+    - match: "^relion_.*"
+      image: harbor.celko.cz/scipion-adaptation/relion:v3
+      needsGpu: false
+      enabled: true
+    - match: "^xmipp_.*"
+      image: harbor.celko.cz/scipion-adaptation/xmipp:v3
+      needsGpu: false
+      enabled: true
+    - match: "^motioncor2(\\b|_)"
+      image: harbor.celko.cz/scipion-adaptation/motioncor2:v2
+      needsGpu: true
+      enabled: true
+    - match: "^ctffind4(\\b|_)"
+      image: harbor.celko.cz/scipion-adaptation/ctffind4:v4
+      needsGpu: false
+      enabled: true
+    - match: "^Gctf(\\b|_)"
+      image: harbor.celko.cz/scipion-adaptation/gctf:v2
+      needsGpu: true
+      enabled: true
+    - match: "^python3.*"
+      image: harbor.celko.cz/scipion-adaptation/scipion3-remote:v3
+      needsGpu: false
+      enabled: true
