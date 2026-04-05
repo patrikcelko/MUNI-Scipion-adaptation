@@ -58,3 +58,25 @@ jobs:
       - name: Run docker tests
         working-directory: docker
         run: pytest --tb=short -q
+
+  helm-lint:
+    name: Helm lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint (default values)
+        run: helm lint helm/
+
+      - name: Lint (with controller)
+        run: helm lint helm/ -f helm/values-controller.yaml
+
+      - name: Template renders (default)
+        run: helm template test helm/ > /dev/null
+
+      - name: Template renders (with controller)
+        run: helm template test helm/ -f helm/values-controller.yaml > /dev/null
