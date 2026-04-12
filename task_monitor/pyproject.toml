@@ -1,0 +1,41 @@
+[project]
+name = "scipion-task-monitor"
+version = "1.0.0"
+description = "Dashboard for monitoring Scipion jobs, pods, metrics, and logs"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0.2",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",        # pydocstyle - docstring style (kept manual)
+    "ANN",      # flake8-annotations - not needed with pyright
+    "T20",      # flake8-print - prints are fine in a GUI app
+    "S",        # bandit - security (urlopen flagged, handled already)
+    "FBT",      # flake8-boolean-trap - BooleanVar etc. are idiomatic tk
+    "BLE001",   # blind-exception - catch-all is valid in tk event loops
+    "ERA",      # eradicate - commented-out code detection (noisy)
+    "COM812",   # missing-trailing-comma - conflicts with formatter
+    "Q",        # flake8-quotes - formatter handles quote style
+    "PLR0913",  # too-many-arguments - tk constructors need many args
+    "PLR2004",  # magic-value-comparison - gauge thresholds are fine inline
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "SLF001", "ARG"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
