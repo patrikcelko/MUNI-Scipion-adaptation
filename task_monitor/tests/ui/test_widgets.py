@@ -74,6 +74,6 @@ def test_classify_multiple_keywords_error_wins() -> None:
 
 
 def test_classify_keyword_inside_word() -> None:
-    """'warning' contains 'warn' — substring matching is intentional."""
+    """'warning' contains 'warn' - substring matching is intentional."""
 
     assert classify_log_line('DeprecationWarning: old API') == 'warn'
