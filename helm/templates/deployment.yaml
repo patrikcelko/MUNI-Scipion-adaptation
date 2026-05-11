@@ -23,6 +23,8 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: scipion
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -57,6 +59,10 @@ spec:
               {{- if .Values.gpu.enabled }}
               nvidia.com/gpu: {{ default "1" .Values.gpu.count | quote }}
               {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           readinessProbe:
             httpGet: { path: "/", port: novnc }
             initialDelaySeconds: 10

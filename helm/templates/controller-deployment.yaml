@@ -20,6 +20,13 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       serviceAccountName: scipion-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: controller
         image: "{{ $ctl.image.repository }}:{{ $ctl.image.tag }}"
@@ -73,6 +80,10 @@ spec:
 {{- end }}
         resources:
 {{ toYaml ($ctl.resources | default (dict)) | indent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         readinessProbe:
           httpGet: { path: /healthz, port: 5000 }
           initialDelaySeconds: 5

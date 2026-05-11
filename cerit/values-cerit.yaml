@@ -1,0 +1,49 @@
+# CERIT Scipion Helm chart
+# ========================
+
+# CERIT Rancher enforces resource quotas, both requests and limits are mandatory.
+resources:
+  requests:
+    cpu: "2"
+    memory: "8Gi"
+  limits:
+    cpu: "4"
+    memory: "16Gi"
+
+# CERIT cluster uses the NFS CSI driver for shared storage.
+persistence:
+  enabled: true
+  size: 50Gi
+  accessMode: ReadWriteMany
+  storageClassName: nfs-csi
+
+# Expose noVNC via Rancher Ingress with HTTPS terminated at the cluster edge.
+ingress:
+  enabled: true
+  className: nginx
+  host: ""  # NOTE: set per-deployment, like scipion.dyn.cloud.e-infra.cz
+  tls:
+    enabled: true
+    secretName: ""  # Leave empty to use default Rancher wildcard certificate
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+service:
+  type: ClusterIP
+  port: 80
+
+controller:
+  enabled: true
+  backend: cerit  # Selects CeritBackend implementation
+
+  service:
+    type: ClusterIP
+    port: 5000
+
+  resources:
+    requests: { cpu: "500m", memory: "512Mi" }
+    limits:   { cpu: "2",    memory: "2Gi" }
+
+  storageMode: "pvc"
