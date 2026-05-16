@@ -14,7 +14,13 @@ def main() -> None:
 
     settings = get_settings()
     app = create_app(settings)
-    uvicorn.run(app, host='0.0.0.0', port=settings.port)
+    uvicorn.run(
+        app,
+        host='0.0.0.0',
+        port=settings.port,
+        proxy_headers=True,
+        forwarded_allow_ips='*',
+    )
 
 
 if __name__ == '__main__':

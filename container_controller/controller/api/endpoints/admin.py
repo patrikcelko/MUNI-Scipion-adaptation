@@ -14,6 +14,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from controller.api.endpoints.jobs import get_known_jobs_count
+from controller.api.schemas import CleanupRunResponse, CleanupStatusResponse, DeletedResponse, DiskResponse, ErrorResponse, ImagesResponse
 from controller.backends import BackendError
 from controller.utilities import get_namespace, is_valid_k8s_name
 
@@ -25,7 +26,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 router: APIRouter = APIRouter(prefix='/api', tags=['admin'])
 
 
-@router.get('/cleanup')
+@router.get('/cleanup', response_model=CleanupStatusResponse)
 async def api_cleanup_status(request: Request) -> dict[str, Any]:
     """Show current cleanup configuration and thread health."""
 
@@ -42,7 +43,7 @@ async def api_cleanup_status(request: Request) -> dict[str, Any]:
     }
 
 
-@router.get('/disk', response_model=None)
+@router.get('/disk', response_model=DiskResponse, responses={500: {'model': ErrorResponse}})
 async def api_disk(request: Request) -> dict[str, Any] | JSONResponse:
     """Report disk usage of the projects filesystem (PVC mount point)."""
 
@@ -65,7 +66,7 @@ async def api_disk(request: Request) -> dict[str, Any] | JSONResponse:
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
-@router.get('/images', response_model=None)
+@router.get('/images', response_model=ImagesResponse, responses={500: {'model': ErrorResponse}})
 async def api_images(request: Request) -> dict[str, Any] | JSONResponse:
     """List container images cached on cluster nodes."""
 
@@ -77,7 +78,7 @@ async def api_images(request: Request) -> dict[str, Any] | JSONResponse:
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
-@router.delete('/job/{job_name}', response_model=None)
+@router.delete('/job/{job_name}', response_model=DeletedResponse, responses={400: {'model': ErrorResponse}, 500: {'model': ErrorResponse}})
 async def api_kill_job(job_name: str, request: Request) -> dict[str, str] | JSONResponse:
     """Delete a specific job and its pods."""
 
@@ -94,7 +95,7 @@ async def api_kill_job(job_name: str, request: Request) -> dict[str, str] | JSON
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
-@router.delete('/pod/{pod_name}', response_model=None)
+@router.delete('/pod/{pod_name}', response_model=DeletedResponse, responses={400: {'model': ErrorResponse}, 500: {'model': ErrorResponse}})
 async def api_kill_pod(pod_name: str, request: Request) -> dict[str, str] | JSONResponse:
     """Delete a specific pod."""
 
@@ -113,7 +114,7 @@ async def api_kill_pod(pod_name: str, request: Request) -> dict[str, str] | JSON
         return JSONResponse({'error': str(exc)}, status_code=500)
 
 
-@router.post('/cleanup/run', response_model=None)
+@router.post('/cleanup/run', response_model=CleanupRunResponse, responses={500: {'model': ErrorResponse}})
 async def api_cleanup_run(
     request: Request,
 ) -> dict[str, int] | JSONResponse:

@@ -77,3 +77,79 @@ class DeletedResponse(BaseModel):
         description='Name of the Kubernetes resource that was deleted.',
     )
     """Exact job or pod name passed in the URL path."""
+
+
+class CleanupRunResponse(BaseModel):
+    """`POST /api/cleanup/run` - results of a manual cleanup pass."""
+
+    deleted_ttl: int = Field(
+        ...,
+        description='Jobs deleted because they exceeded `jobs_ttl` seconds.',
+    )
+    """TTL-based deletions: finished longer ago than `Settings.jobs_ttl`."""
+
+    deleted_cap: int = Field(
+        ...,
+        description='Jobs deleted to stay within `max_finished_jobs` cap.',
+    )
+    """Cap-based deletions: oldest finished jobs pruned when count > cap."""
+
+    evicted: int = Field(
+        ...,
+        description='Evicted pods deleted during this cleanup pass.',
+    )
+    """Pods in `Failed` phase with reason `Evicted`."""
+
+
+class ImageEntry(BaseModel):
+    """A single container image cached on a node."""
+
+    names: list[str] = Field(
+        ...,
+        description='All known tags / digests for this image.',
+    )
+    """May include multiple tags pointing to the same layer set."""
+
+    size_mb: float = Field(
+        ...,
+        description='Uncompressed image size in MiB, 1 decimal place.',
+    )
+    """Derived from `image.size_bytes` reported by the kubelet."""
+
+
+class NodeImageInfo(BaseModel):
+    """Image inventory for a single cluster node."""
+
+    node: str = Field(
+        ...,
+        description='Node name from `metadata.name`.',
+    )
+    """Unique within the cluster."""
+
+    images: list[ImageEntry] = Field(
+        ...,
+        description='Images cached on this node, sorted by size descending.',
+    )
+    """Empty list when the node has no cached images."""
+
+    total_mb: float = Field(
+        ...,
+        description='Sum of all image sizes on this node in MiB.',
+    )
+    """Rounded to 1 decimal place."""
+
+    count: int = Field(
+        ...,
+        description='Total number of distinct images on this node.',
+    )
+    """Equal to `len(images)`."""
+
+
+class ImagesResponse(BaseModel):
+    """`GET /api/images` response."""
+
+    nodes: list[NodeImageInfo] = Field(
+        ...,
+        description='Per-node image inventory for every node in the cluster.',
+    )
+    """One entry per node returned by `list_node()`."""

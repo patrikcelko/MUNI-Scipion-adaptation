@@ -13,6 +13,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
+from controller.api.schemas import (
+    ErrorResponse,
+    EventListResponse,
+    JobListResponse,
+    LogsResponse,
+    MetricsResponse,
+    PodListResponse,
+)
 from controller.utilities import (
     age,
     get_namespace,
@@ -31,7 +39,7 @@ _EPOCH: datetime = datetime(1970, 1, 1, tzinfo=UTC)
 """Fallback timestamp for events with all-None time fields."""
 
 
-@router.get('/pods')
+@router.get('/pods', response_model=PodListResponse)
 async def api_pods(request: Request) -> dict[str, list[dict[str, Any]]]:
     """List all pods in the namespace with container- and resource-level detail."""
 
@@ -87,7 +95,7 @@ async def api_pods(request: Request) -> dict[str, list[dict[str, Any]]]:
     return {'pods': result}
 
 
-@router.get('/jobs')
+@router.get('/jobs', response_model=JobListResponse)
 async def api_jobs(request: Request) -> dict[str, list[dict[str, Any]]]:
     """List all jobs in the namespace with status info."""
 
@@ -113,7 +121,7 @@ async def api_jobs(request: Request) -> dict[str, list[dict[str, Any]]]:
     return {'jobs': result}
 
 
-@router.get('/events')
+@router.get('/events', response_model=EventListResponse)
 async def api_events(request: Request) -> dict[str, list[dict[str, Any]]]:
     """Return the 50 most recent namespace events."""
 
@@ -140,7 +148,7 @@ async def api_events(request: Request) -> dict[str, list[dict[str, Any]]]:
     return {'events': result}
 
 
-@router.get('/metrics')
+@router.get('/metrics', response_model=MetricsResponse)
 async def api_metrics(
     request: Request,
 ) -> dict[str, list[dict[str, Any]]]:
@@ -204,7 +212,7 @@ async def api_metrics(
     return {'nodes': node_metrics, 'pods': pod_metrics}
 
 
-@router.get('/logs/{pod_name}', response_model=None)
+@router.get('/logs/{pod_name}', response_model=LogsResponse, responses={400: {'model': ErrorResponse}, 500: {'model': LogsResponse}})
 async def api_logs(
     pod_name: str,
     request: Request,

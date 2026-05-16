@@ -4,9 +4,13 @@ Response / request models
 """
 
 from controller.api.schemas.admin import (
+    CleanupRunResponse,
     CleanupStatusResponse,
     DeletedResponse,
     DiskResponse,
+    ImageEntry,
+    ImagesResponse,
+    NodeImageInfo,
 )
 from controller.api.schemas.dispatcher import (
     ImportWorkflowResponse,
@@ -33,6 +37,7 @@ from controller.api.schemas.monitoring import (
 
 __all__ = [
     'CancelResponse',
+    'CleanupRunResponse',
     'CleanupStatusResponse',
     'ContainerInfo',
     'DeletedResponse',
@@ -40,11 +45,14 @@ __all__ = [
     'ErrorResponse',
     'EventInfo',
     'EventListResponse',
+    'ImageEntry',
+    'ImagesResponse',
     'ImportWorkflowResponse',
     'JobInfo',
     'JobListResponse',
     'LogsResponse',
     'MetricsResponse',
+    'NodeImageInfo',
     'NodeMetric',
     'PodInfo',
     'PodListResponse',

@@ -19,6 +19,8 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from controller.api.schemas import ErrorResponse, ImportWorkflowResponse
+
 if TYPE_CHECKING:
     from controller.utilities.config import Settings
 
@@ -56,13 +58,13 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
     parsed = urlparse(workflow_url)
     if parsed.scheme not in ('https', 'http'):
         return JSONResponse(
-            {'ok': False, 'error': 'workflow_url must use http(s)'},
+            {'error': 'workflow_url must use http(s)'},
             status_code=400,
         )
 
     if not parsed.hostname or _is_private_host(parsed.hostname):
         return JSONResponse(
-            {'ok': False, 'error': 'workflow_url must not target private networks'},
+            {'error': 'workflow_url must not target private networks'},
             status_code=400,
         )
 
@@ -74,27 +76,27 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
 
         if len(raw) > _MAX_WORKFLOW_BYTES:
             return JSONResponse(
-                {'ok': False, 'error': 'Workflow file exceeds 10 MB limit'},
+                {'error': 'Workflow file exceeds 10 MB limit'},
                 status_code=400,
             )
 
         workflow_json: Any = json.loads(raw)
     except (urllib.error.URLError, ValueError, json.JSONDecodeError) as exc:
         return JSONResponse(
-            {'ok': False, 'error': f'Failed to download workflow: {exc}'},
+            {'error': f'Failed to download workflow: {exc}'},
             status_code=400,
         )
 
     if not isinstance(workflow_json, list):
         return JSONResponse(
-            {'ok': False, 'error': 'Workflow JSON must be a list of protocols'},
+            {'error': 'Workflow JSON must be a list of protocols'},
             status_code=400,
         )
 
     return workflow_json
 
 
-@router.post('/import_workflow', response_model=None)
+@router.post('/import_workflow', response_model=ImportWorkflowResponse, responses={400: {'model': ErrorResponse}})
 async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
     """Import a Scipion workflow JSON from a URL into a new project."""
 
@@ -103,14 +105,14 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
         data: dict[str, Any] = await request.json()
     except Exception:
         return JSONResponse(
-            {'ok': False, 'error': 'invalid or missing JSON body'},
+            {'error': 'invalid or missing JSON body'},
             status_code=400,
         )
 
     workflow_url: str | None = data.get('workflow_url')
     if not workflow_url:
         return JSONResponse(
-            {'ok': False, 'error': 'workflow_url is required'},
+            {'error': 'workflow_url is required'},
             status_code=400,
         )
 

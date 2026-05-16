@@ -18,6 +18,7 @@ from typing import Any, cast
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
+from controller.api.schemas import CancelResponse, ErrorResponse, SubmitResponse
 from controller.backends import BackendError
 from controller.utilities import is_safe_path, is_valid_k8s_name, resolve_job_name
 from controller.utilities.config import Settings
@@ -170,7 +171,7 @@ def _register_job(job_id: str) -> None:
         _known_jobs.popitem(last=False)
 
 
-@router.post('/submit', response_model=None)
+@router.post('/submit', response_model=SubmitResponse, responses={400: {'model': ErrorResponse}, 422: {'model': ErrorResponse}})
 async def submit(request: Request) -> dict[str, str] | JSONResponse:
     """Accept a Scipion command and create a Kubernetes Job for it."""
 
@@ -290,7 +291,7 @@ async def status(job_id: str, request: Request) -> PlainTextResponse:
     return PlainTextResponse(phase + '\n')
 
 
-@router.post('/cancel/{job_id}', response_model=None)
+@router.post('/cancel/{job_id}', response_model=CancelResponse, responses={400: {'model': CancelResponse}, 500: {'model': CancelResponse}})
 async def cancel(job_id: str, request: Request) -> dict[str, bool] | JSONResponse:
     """Delete a running job (and its pods)."""
 

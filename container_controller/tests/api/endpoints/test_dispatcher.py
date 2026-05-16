@@ -208,4 +208,4 @@ def test_dispatcher_invalid_json_plain_text_body(client: Any) -> None:
         headers={'content-type': 'text/plain'},
     )
     assert resp.status_code == 400
-    assert resp.json()['ok'] is False
+    assert 'error' in resp.json()
