@@ -52,7 +52,7 @@ jobs:
 
       - name: Pyright
         working-directory: container_controller
-        run: pyright controller/
+        run: pyright controller/ tests/
 
   ruff-monitor:
     name: Ruff (Task Monitor)
