@@ -49,10 +49,14 @@ def get_known_jobs_count() -> int:
 
 _RELION_PATCH_SCRIPT: str = (
     'import glob\n'
-    'f = glob.glob(\n'
+    'files = glob.glob(\n'
     "    '/opt/scipion/.scipion3/lib/python*/site-packages'\n"
     "    '/relion/convert/convert_deprecated.py'\n"
-    ')[0]\n'
+    ')\n'
+    'if not files:\n'
+    "    print('[PATCH] convert_deprecated.py not found, skipping')\n"
+    '    raise SystemExit(0)\n'
+    'f = files[0]\n'
     's = open(f).read()\n'
     'o = (\n'
     "    'def readCoordinates(mic, fileName, coordsSet):\\n'\n"
@@ -315,8 +319,6 @@ def _build_tool_setup(protocol_name: str | None) -> str:
             '/opt/scipion/software/em/relion-4.0/bin/"$(basename "$bin")"'
             ' 2>/dev/null; '
             'done && '
-            '/opt/scipion/.scipion3/bin/pip install'
-            ' --no-deps --force-reinstall scipion-em-relion 2>&1 | tail -3 && '
             f'{_RELION_PATCH_CMD}'
             'echo "[TOOL-SETUP] Relion setup complete..." && '
         )
@@ -339,7 +341,6 @@ def _build_tool_setup(protocol_name: str | None) -> str:
             'chmod +x /usr/local/bin/conda && '
             'ln -sf /usr/local/bin/gctf /usr/local/bin/Gctf_v1.18_sm30-75_cu10.1 && '
             'ln -sf /usr/local/bin/gctf /usr/local/bin/Gctf_v1.18_sm30_cu8.0 && '
-            '/opt/scipion/.scipion3/bin/pip install --no-deps --force-reinstall scipion-em-gctf 2>&1 | tail -3 && '
             'if [ ! -d /opt/scipion/software/em/gctf-1.18 ]; then '
             '  mkdir -p /opt/scipion/software/em/gctf-1.18/bin && '
             '  ln -sf /usr/local/bin/gctf /opt/scipion/software/em/gctf-1.18/bin/Gctf_v1.18_sm30_cu8.0 && '

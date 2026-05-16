@@ -48,7 +48,7 @@ async def api_disk(request: Request) -> dict[str, Any] | JSONResponse:
     """Report disk usage of the projects filesystem (PVC mount point)."""
 
     cfg: Settings = request.app.state.settings
-    path = cfg.local_path or '/'
+    path = '/projects' if cfg.storage_mode == 'pvc' else (cfg.local_path or '/')
     try:
         usage = shutil.disk_usage(path)
         total_gi: float = round(usage.total / (1024**3), 1)

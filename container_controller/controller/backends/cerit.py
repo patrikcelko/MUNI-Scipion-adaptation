@@ -4,16 +4,9 @@ CERIT backend
 """
 
 import logging
-from typing import TYPE_CHECKING
-
-from kubernetes import client
 
 from controller.backends import register_backend
 from controller.backends.k8s import K8sBackend
-from controller.utilities import k8s
-
-if TYPE_CHECKING:
-    from controller.utilities.config import Settings
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -26,93 +19,24 @@ _CERIT_GPU_RESOURCE: str = 'nvidia.com/gpu'
 class CeritBackend(K8sBackend):
     """CERIT-SC Kubernetes backend (Rancher-managed clusters)."""
 
-    def submit_job(
+    def _build_resource_requirements(
         self,
-        *,
-        namespace: str,
-        job_name: str,
-        image: str,
-        command: list[str],
-        env: dict[str, str],
-        labels: dict[str, str],
-        mem_mb: int = 4096,
-        gpu: bool = False,
-        prefer_node: str | None = None,
-    ) -> None:
-        cfg: Settings = self.settings
+        mem_mb: int,
+        gpu: bool,
+    ) -> tuple[dict[str, str], dict[str, str]]:
+        """CERIT-SC requires matching requests and limits on every container,
+        with a higher CPU limit and a memory request floor of 2 GiB.
+        """
 
-        volumes, mounts = self._build_volumes()
-
-        env_vars: list[client.V1EnvVar] = [client.V1EnvVar(name=k, value=v) for k, v in env.items()]
-
-        # CERIT-SC requires BOTH requests and limits on every container.
-        # Memory request is half of limit but at least the default floor,
-        # and never exceeding the limit itself.
         mem_request: int = min(max(mem_mb // 2, _CERIT_DEFAULT_MEM_REQUEST_MB), mem_mb)
-        resource_requests: dict[str, str] = {
-            'cpu': _CERIT_DEFAULT_CPU_REQUEST,
-            'memory': f'{mem_request}Mi',
-        }
-        resource_limits: dict[str, str] = {
-            'cpu': _CERIT_DEFAULT_CPU_LIMIT,
-            'memory': f'{mem_mb}Mi',
-        }
+        limits: dict[str, str] = {'cpu': _CERIT_DEFAULT_CPU_LIMIT, 'memory': f'{mem_mb}Mi'}
+        requests: dict[str, str] = {'cpu': _CERIT_DEFAULT_CPU_REQUEST, 'memory': f'{mem_request}Mi'}
+
         if gpu:
-            resource_limits[_CERIT_GPU_RESOURCE] = '1'
-            resource_requests[_CERIT_GPU_RESOURCE] = '1'
+            limits[_CERIT_GPU_RESOURCE] = '1'
+            requests[_CERIT_GPU_RESOURCE] = '1'
 
-        main_container: client.V1Container = client.V1Container(
-            name='tool',
-            image=image,
-            image_pull_policy='IfNotPresent',
-            command=command,
-            volume_mounts=mounts,
-            env=env_vars,
-            resources=client.V1ResourceRequirements(
-                limits=resource_limits,
-                requests=resource_requests,
-            ),
-        )
-
-        containers: list[client.V1Container] = [main_container]
-
-        if cfg.onedata_enabled:
-            containers.append(self._build_onedata_sidecar(main_container))
-
-        pod_spec: client.V1PodSpec = client.V1PodSpec(
-            restart_policy='Never',
-            containers=containers,
-            volumes=volumes,
-            node_selector=cfg.node_selector_json or None,
-            tolerations=[client.V1Toleration(**t) for t in (cfg.tolerations_json or [])],
-        )
-
-        if cfg.storage_mode == 'local' and prefer_node:
-            pod_spec.node_name = prefer_node
-
-        template: client.V1PodTemplateSpec = client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(labels=labels),
-            spec=pod_spec,
-        )
-
-        job_metadata_labels = {k: v for k, v in labels.items() if k in ('app', 'tool')}
-
-        job_obj: client.V1Job = client.V1Job(
-            api_version='batch/v1',
-            kind='Job',
-            metadata=client.V1ObjectMeta(
-                name=job_name,
-                namespace=namespace,
-                labels=job_metadata_labels,
-            ),
-            spec=client.V1JobSpec(
-                backoff_limit=0,
-                ttl_seconds_after_finished=cfg.jobs_ttl,
-                template=template,
-            ),
-        )
-
-        k8s.batch.create_namespaced_job(namespace, job_obj)
+        return limits, requests
 
 
 register_backend('cerit', CeritBackend)

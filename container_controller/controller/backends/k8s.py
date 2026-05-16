@@ -44,18 +44,12 @@ class K8sBackend(InfraBackend):
         volumes, mounts = self._build_volumes()
         env_vars: list[client.V1EnvVar] = [client.V1EnvVar(name=k, value=v) for k, v in env.items()]
 
-        resource_limits: dict[str, str] = {'memory': f'{mem_mb}Mi', 'cpu': '2'}
-        resource_requests: dict[str, str] = {
-            'memory': f'{max(mem_mb // 2, 512)}Mi',
-            'cpu': '500m',
-        }
-        if gpu:
-            resource_limits['nvidia.com/gpu'] = '1'
+        resource_limits, resource_requests = self._build_resource_requirements(mem_mb, gpu)
 
         main_container: client.V1Container = client.V1Container(
             name='tool',
             image=image,
-            image_pull_policy='IfNotPresent',
+            image_pull_policy='Always',
             command=command,
             volume_mounts=mounts,
             env=env_vars,
@@ -107,6 +101,21 @@ class K8sBackend(InfraBackend):
         )
 
         k8s.batch.create_namespaced_job(namespace, job_obj)
+
+    def _build_resource_requirements(
+        self,
+        mem_mb: int,
+        gpu: bool,
+    ) -> tuple[dict[str, str], dict[str, str]]:
+        """Return (limits, requests) dicts for a container."""
+
+        limits: dict[str, str] = {'memory': f'{mem_mb}Mi', 'cpu': '2'}
+        requests: dict[str, str] = {'memory': f'{max(mem_mb // 2, 512)}Mi', 'cpu': '500m'}
+
+        if gpu:
+            limits['nvidia.com/gpu'] = '1'
+
+        return limits, requests
 
     def read_job_phase(self, job_name: str, namespace: str) -> str | None:
         try:

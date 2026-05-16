@@ -40,8 +40,10 @@ def test_cleanup_status_returns_max_finished_jobs(client: Any) -> None:
 def test_disk_returns_usage(client: Any) -> None:
     """Disk usage endpoint returns usage data."""
 
-    resp = client.get('/api/disk')
-    assert resp.status_code == 200
+    _usage = SimpleNamespace(total=100 * 1024**3, used=40 * 1024**3, free=60 * 1024**3)
+    with patch('shutil.disk_usage', return_value=_usage):
+        resp = client.get('/api/disk')
+        assert resp.status_code == 200
 
     data = resp.json()
     assert 'total_gi' in data
@@ -54,10 +56,13 @@ def test_disk_returns_usage(client: Any) -> None:
 def test_disk_values_are_floats(client: Any) -> None:
     """Disk values are numeric."""
 
-    resp = client.get('/api/disk')
-    data = resp.json()
-    assert isinstance(data['total_gi'], (int, float))
-    assert isinstance(data['used_gi'], (int, float))
+    _usage = SimpleNamespace(total=100 * 1024**3, used=40 * 1024**3, free=60 * 1024**3)
+    with patch('shutil.disk_usage', return_value=_usage):
+        resp = client.get('/api/disk')
+        data = resp.json()
+
+        assert isinstance(data['total_gi'], (int, float))
+        assert isinstance(data['used_gi'], (int, float))
 
 
 def test_images_returns_node_images(client: Any) -> None:

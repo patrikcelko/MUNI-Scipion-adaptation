@@ -121,9 +121,8 @@ def choose_tool_by_protocol(
 
 
 def choose_tool(cmd0: str, toolmap_path: str) -> dict[str, Any] | None:
-    """Legacy command-prefix routing (backward compatibility)."""
+    """Command-prefix routing."""
 
-    # TODO: Will be removed
     for tool in load_toolmap(toolmap_path):
         if not tool.get('enabled', True):
             continue
