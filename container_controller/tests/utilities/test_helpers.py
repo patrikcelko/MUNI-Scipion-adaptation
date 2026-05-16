@@ -458,7 +458,7 @@ def test_age_future_timestamp_slightly_future_returns_zero() -> None:
     assert age(ts) == '0s'  # type: ignore
 
 
-def test_parse_mem_g_suffix_1G_is_approximately_953_MiB() -> None:
+def test_parse_mem_g_suffix_1g_is_approximately_953_mib() -> None:
     """parse_mem('1G') ≈ 953.674 MiB."""
 
     result = parse_mem('1G')
@@ -467,7 +467,7 @@ def test_parse_mem_g_suffix_1G_is_approximately_953_MiB() -> None:
     assert abs(result - expected) < 0.01
 
 
-def test_parse_mem_g_suffix_2G_is_approximately_1907_MiB() -> None:
+def test_parse_mem_g_suffix_2g_is_approximately_1907_mib() -> None:
     """parse_mem('2G') ≈ 1907.348 MiB."""
 
     result = parse_mem('2G')

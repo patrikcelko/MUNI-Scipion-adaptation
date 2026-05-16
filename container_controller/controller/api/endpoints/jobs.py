@@ -19,8 +19,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from controller.backends import BackendError
-from controller.utilities.config import Settings
 from controller.utilities import is_safe_path, is_valid_k8s_name, resolve_job_name
+from controller.utilities.config import Settings
 from controller.utilities.routing import (
     choose_tool,
     choose_tool_by_protocol,
@@ -40,6 +40,12 @@ router: APIRouter = APIRouter(tags=['jobs'])
 _MAX_KNOWN_JOBS: int = 10_000
 _known_jobs: OrderedDict[str, None] = OrderedDict()
 
+
+def get_known_jobs_count() -> int:
+    """Return the current number of tracked recently-submitted job IDs."""
+
+    return len(_known_jobs)
+
 # Scipion _libNone patch
 _LIBNONE_SCRIPT: str = (
     'import pwem, os\n'
@@ -58,11 +64,135 @@ _LIBNONE_SCRIPT: str = (
 _LIBNONE_B64: str = base64.b64encode(_LIBNONE_SCRIPT.encode()).decode()
 _LIBNONE_PATCH: str = f'echo {_LIBNONE_B64} | base64 -d | python3 - 2>/dev/null; '
 
+# Relion readCoordinates patch (emtable compatibility)
+_RELION_PATCH_SCRIPT: str = (
+    'import glob\n'
+    'f = glob.glob(\n'
+    "    '/opt/scipion/.scipion3/lib/python*/site-packages'\n"
+    "    '/relion/convert/convert_deprecated.py'\n"
+    ')[0]\n'
+    's = open(f).read()\n'
+    'o = (\n'
+    "    'def readCoordinates(mic, fileName, coordsSet):\\n'\n"
+    "    '    for row in md.iterRows(fileName):\\n'\n"
+    "    '        coord = rowToCoordinate(row)\\n'\n"
+    "    '        coord.setX(coord.getX())\\n'\n"
+    "    '        coord.setY(coord.getY())\\n'\n"
+    "    '        coord.setMicrograph(mic)\\n'\n"
+    "    '        coordsSet.append(coord)'\n"
+    ')\n'
+    'n = (\n'
+    "    'def readCoordinates(mic, fileName, coordsSet):\\n'\n"
+    "    '    from emtable import Table as _T\\n'\n"
+    "    '    import os as _os\\n'\n"
+    "    '    if not _os.path.exists(fileName):\\n'\n"
+    "    '        return\\n'\n"
+    "    '    for row in _T(fileName=fileName):\\n'\n"
+    "    '        coord = pwobj.Coordinate()\\n'\n"
+    "    '        coord.setX(float(row.rlnCoordinateX))\\n'\n"
+    "    '        coord.setY(float(row.rlnCoordinateY))\\n'\n"
+    "    '        coord.setMicrograph(mic)\\n'\n"
+    "    '        coordsSet.append(coord)'\n"
+    ')\n'
+    "open(f, 'w').write(s.replace(o, n))\n"
+    "print('[PATCH] readCoordinates patched for emtable')\n"
+)
+_RELION_PATCH_B64: str = base64.b64encode(_RELION_PATCH_SCRIPT.encode()).decode()
+_RELION_PATCH_CMD: str = (
+    f'echo {_RELION_PATCH_B64} | base64 -d | python3 - 2>/dev/null && '
+)
+
 
 def _get_settings(request: Request) -> Settings:
     """Retrieve the settings instance"""
 
-    return cast(Settings, request.app.state.settings)
+    return cast('Settings', request.app.state.settings)
+
+
+def _find_tool(
+    protocol_name: str | None,
+    cmd0: str,
+    toolmap_path: str,
+) -> dict[str, Any] | JSONResponse:
+    """Resolve the tool config entry, or return a 422 JSONResponse on failure."""
+    tool: dict[str, Any] | None = None
+    if protocol_name:
+        tool = choose_tool_by_protocol(protocol_name, toolmap_path)
+    if not tool:
+        logger.debug('Falling back to command-prefix routing: %s', cmd0)
+        tool = choose_tool(cmd0, toolmap_path)
+    if not tool:
+        avail = [
+            t.get('image')
+            for t in load_toolmap(toolmap_path)
+            if t.get('enabled', True)
+        ]
+        logger.error(
+            "No suitable container for protocol '%s'. Available: %s",
+            protocol_name or 'unknown',
+            avail,
+        )
+        return JSONResponse(
+            {
+                'error': (
+                    f'No container mapping found for protocol '
+                    f"'{protocol_name or 'unknown'}'"
+                )
+            },
+            status_code=422,
+        )
+    return tool
+
+
+def _build_cleanup_and_chown(
+    project_root: str,
+    run_dir: str,
+) -> tuple[str, str]:
+    """Build (cleanup_cmd, chown_cmd) shell fragments for a protocol run directory."""
+
+    cleanup_cmd = (
+        f'echo "[CLEANUP] Removing stale outputs in {run_dir}" && '
+        f'rm -f "{project_root}/{run_dir}"/*.sqlite '
+        f'"{project_root}/{run_dir}"/summary.txt '
+        f'"{project_root}/{run_dir}"/summaryForMonitor.txt && '
+        f'rm -f "{project_root}/{run_dir}/logs/run.stderr" '
+        f'"{project_root}/{run_dir}/logs/run.stdout" '
+        f'"{project_root}/{run_dir}/logs/steps.sqlite" && '
+    )
+
+    logger.debug('Will clean stale outputs in %s', run_dir)
+
+    run_db_path: str = f'{project_root}/{run_dir}/logs/run.db'
+    _script: str = (
+        'import sqlite3,sys\n'
+        'c=sqlite3.connect(sys.argv[1],timeout=10)\n'
+        'r=c.execute("UPDATE Objects SET value=0 '
+        "WHERE name LIKE '%._streamState' AND value=1\")\n"
+        'n=r.rowcount;c.commit();c.close()\n'
+        "print(f'[STREAM-FIX] Closed {n} open output streams') if n else None\n"
+    )
+    _b64: str = base64.b64encode(_script.encode()).decode()
+    close_streams_cmd: str = (
+        f'echo {_b64} | base64 -d | python3 - "{run_db_path}" 2>/dev/null; '
+    )
+
+    chown_cmd = (
+        f'; _ec=$?; '
+        f'{close_streams_cmd}'
+        f'chown -R 1000:1000 "{project_root}/{run_dir}" 2>/dev/null; '
+        f'chown 1000:1000 "{project_root}/project.sqlite" 2>/dev/null; '
+        f'exit $_ec'
+    )
+
+    return cleanup_cmd, chown_cmd
+
+
+def _register_job(job_id: str) -> None:
+    """Track a submitted job ID, evicting the oldest entry when the cap is reached."""
+
+    _known_jobs[job_id] = None
+    if len(_known_jobs) > _MAX_KNOWN_JOBS:
+        _known_jobs.popitem(last=False)
 
 
 @router.post('/submit', response_model=None)
@@ -79,42 +209,17 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
     if not original:
         return JSONResponse({'error': 'missing originalCmd'}, status_code=400)
 
-    cmd0: str = original.split()[0]
+    cmd0: str = original.split(maxsplit=1)[0]
     logger.debug('Received command: %s', original)
 
     protocol_name: str | None = detect_protocol_from_command(original)
     logger.debug('Detected protocol: %s', protocol_name or 'unknown')
 
-    # Tool resolution
-    tool: dict[str, Any] | None = None
-    if protocol_name:
-        tool = choose_tool_by_protocol(protocol_name, cfg.toolmap_path)
+    tool_result = _find_tool(protocol_name, cmd0, cfg.toolmap_path)
+    if isinstance(tool_result, JSONResponse):
+        return tool_result
 
-    if not tool:
-        logger.debug('Falling back to command-prefix routing: %s', cmd0)
-        tool = choose_tool(cmd0, cfg.toolmap_path)
-
-    if not tool:
-        avail = [
-            t.get('image')
-            for t in load_toolmap(cfg.toolmap_path)
-            if t.get('enabled', True)
-        ]
-        logger.error(
-            "No suitable container for protocol '%s'. Available: %s",
-            protocol_name or 'unknown',
-            avail,
-        )
-
-        return JSONResponse(
-            {
-                'error': (
-                    f'No container mapping found for protocol '
-                    f"'{protocol_name or 'unknown'}'"
-                )
-            },
-            status_code=422,
-        )
+    tool: dict[str, Any] = tool_result
 
     # Resolve submission parameters
     ns: str = cfg.namespace
@@ -158,59 +263,23 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
         'OMPI_ALLOW_RUN_AS_ROOT_CONFIRM': '1',
     }
 
-    # Per-protocol tool setup commands
     tool_setup_cmd: str = _build_tool_setup(protocol_name)
 
-    # Cleanup stale output files
     run_dir: str | None = detect_protocol_run_dir(original)
     if run_dir and not is_safe_path(run_dir):
         return JSONResponse(
             {'error': 'run directory contains invalid characters'},
             status_code=400,
         )
-    cleanup_cmd: str = ''
-    chown_cmd: str = ''
+    cleanup_cmd, chown_cmd = (
+        _build_cleanup_and_chown(project_root, run_dir) if run_dir else ('', '')
+    )
 
-    if run_dir:
-        cleanup_cmd = (
-            f'echo "[CLEANUP] Removing stale outputs in {run_dir}" && '
-            f'rm -f "{project_root}/{run_dir}"/*.sqlite '
-            f'"{project_root}/{run_dir}"/summary.txt '
-            f'"{project_root}/{run_dir}"/summaryForMonitor.txt && '
-            f'rm -f "{project_root}/{run_dir}/logs/run.stderr" '
-            f'"{project_root}/{run_dir}/logs/run.stdout" '
-            f'"{project_root}/{run_dir}/logs/steps.sqlite" && '
-        )
-        logger.debug('Will clean stale outputs in %s', run_dir)
-
-        run_db_path: str = f'{project_root}/{run_dir}/logs/run.db'
-        _script: str = (
-            'import sqlite3,sys\n'
-            'c=sqlite3.connect(sys.argv[1],timeout=10)\n'
-            'r=c.execute("UPDATE Objects SET value=0 '
-            "WHERE name LIKE '%._streamState' AND value=1\")\n"
-            'n=r.rowcount;c.commit();c.close()\n'
-            "print(f'[STREAM-FIX] Closed {n} open output streams') if n else None\n"
-        )
-        _b64: str = base64.b64encode(_script.encode()).decode()
-        close_streams_cmd: str = (
-            f'echo {_b64} | base64 -d | python3 - "{run_db_path}" 2>/dev/null; '
-        )
-        chown_cmd = (
-            f'; _ec=$?; '
-            f'{close_streams_cmd}'
-            f'chown -R 1000:1000 "{project_root}/{run_dir}" 2>/dev/null; '
-            f'chown 1000:1000 "{project_root}/project.sqlite" 2>/dev/null; '
-            f'exit $_ec'
-        )
-
-    # Resource limits
     try:
         mem_mb: int = max(512, min(65536, int(res.get('memoryMb', 4096))))
     except (ValueError, TypeError):
         mem_mb = 4096
 
-    # Build full shell command string
     full_shell_cmd: str = (
         'mkdir -p /home/scipion/ScipionUserData && '
         'ln -sfn /projects /home/scipion/ScipionUserData/projects && '
@@ -227,7 +296,6 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
         or 'unknown'
     )
 
-    # Delegate to the backend
     backend = request.app.state.backend
     backend.submit_job(
         namespace=ns,
@@ -244,9 +312,7 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
         gpu=want_gpu,
         prefer_node=prefer_node,
     )
-    _known_jobs[job_id] = None
-    if len(_known_jobs) > _MAX_KNOWN_JOBS:
-        _known_jobs.popitem(last=False)
+    _register_job(job_id)
     return {'jobId': job_name, 'jobNumber': job_id}
 
 
@@ -315,18 +381,14 @@ def _build_tool_setup(protocol_name: str | None) -> str:
             'export RELION_HOME=/usr/local && '
             'mkdir -p /opt/scipion/software/em/relion-4.0/bin && '
             'for bin in /usr/local/bin/relion_*; do '
-            '  ln -sf "$bin" /opt/scipion/software/em/relion-4.0/bin/"$(basename "$bin")" 2>/dev/null; '
+            '  ln -sf "$bin" '
+            '/opt/scipion/software/em/relion-4.0/bin/"$(basename "$bin")"'
+            ' 2>/dev/null; '
             'done && '
-            '/opt/scipion/.scipion3/bin/pip install --no-deps --force-reinstall scipion-em-relion 2>&1 | tail -3 && '
-            'python3 -c "'
-            "f=__import__('glob').glob('/opt/scipion/.scipion3/lib/python*/site-packages/relion/convert/convert_deprecated.py')[0];"
-            's=open(f).read();'
-            r"o='def readCoordinates(mic, fileName, coordsSet):\n    for row in md.iterRows(fileName):\n        coord = rowToCoordinate(row)\n        coord.setX(coord.getX())\n        coord.setY(coord.getY())\n        coord.setMicrograph(mic)\n        coordsSet.append(coord)';"
-            r"n='def readCoordinates(mic, fileName, coordsSet):\n    from emtable import Table as _T\n    import os as _os\n    if not _os.path.exists(fileName):\n        return\n    for row in _T(fileName=fileName):\n        coord = pwobj.Coordinate()\n        coord.setX(float(row.rlnCoordinateX))\n        coord.setY(float(row.rlnCoordinateY))\n        coord.setMicrograph(mic)\n        coordsSet.append(coord)';"
-            "open(f,'w').write(s.replace(o,n));"
-            "print('[PATCH] readCoordinates patched for emtable')"
-            '" && '
-            'echo "[TOOL-SETUP] Relion setup complete" && '
+            '/opt/scipion/.scipion3/bin/pip install'
+            ' --no-deps --force-reinstall scipion-em-relion 2>&1 | tail -3 && '
+            f'{_RELION_PATCH_CMD}'
+            'echo "[TOOL-SETUP] Relion setup complete..." && '
         )
 
     elif 'CTFFind' in protocol_name or 'Cistem' in protocol_name:
@@ -337,7 +399,7 @@ def _build_tool_setup(protocol_name: str | None) -> str:
             'mkdir -p /opt/scipion/software/em/cistem-1.0.0-beta/bin && '
             'ln -sf /opt/scipion/software/em/ctffind-5.0.2/bin/ctffind '
             '   /opt/scipion/software/em/cistem-1.0.0-beta/bin/ctffind && '
-            'echo "[TOOL-SETUP] ctffind setup complete" && '
+            'echo "[TOOL-SETUP] Ctffind setup completed" && '
         )
 
     elif 'Gctf' in protocol_name:
@@ -352,11 +414,11 @@ def _build_tool_setup(protocol_name: str | None) -> str:
             '  mkdir -p /opt/scipion/software/em/gctf-1.18/bin && '
             '  ln -sf /usr/local/bin/gctf /opt/scipion/software/em/gctf-1.18/bin/Gctf_v1.18_sm30_cu8.0 && '
             '  ln -sf /usr/local/bin/gctf /opt/scipion/software/em/gctf-1.18/bin/Gctf_v1.18_sm30-75_cu10.1 && '
-            '  echo "[TOOL-SETUP] Created GCTF_HOME symlinks"; '
+            '  echo "[TOOL-SETUP] Created GCTF_HOME symlinks..."; '
             'fi && '
             'export CONDA_PREFIX=/usr/local/cuda && '
             'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH} && '
-            'echo "[TOOL-SETUP] Gctf setup complete" && '
+            'echo "[TOOL-SETUP] Gctf setup completed" && '
         )
 
     return cmd

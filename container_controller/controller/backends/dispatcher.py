@@ -18,6 +18,7 @@ Configuration:
     DISPATCHER_TIMEOUT - HTTP timeout in seconds (default: 30)
 """
 
+import contextlib
 import json
 import logging
 import urllib.error
@@ -69,23 +70,26 @@ class DispatcherBackend(InfraBackend):
 
             return json.loads(raw.decode('utf-8'))
         except (json.JSONDecodeError, ValueError) as exc:
+            msg = f'Dispatcher returned invalid JSON: {exc}'
             raise BackendError(
-                f'Dispatcher returned invalid JSON: {exc}',
+                msg,
                 status_code=502,
             ) from exc
         except urllib.error.HTTPError as exc:
             error_body: str = ''
-            try:
+
+            with contextlib.suppress(Exception):
                 error_body = exc.read().decode('utf-8', errors='replace')[:500]
-            except Exception:
-                pass
+
+            msg = f'Dispatcher HTTP {exc.code}: {error_body}'
             raise BackendError(
-                f'Dispatcher HTTP {exc.code}: {error_body}',
+                msg,
                 status_code=exc.code,
             ) from exc
         except urllib.error.URLError as exc:
+            msg = f'Dispatcher unreachable: {exc.reason}'
             raise BackendError(
-                f'Dispatcher unreachable: {exc.reason}', status_code=502
+                msg, status_code=502
             ) from exc
 
     def submit_job(
@@ -173,7 +177,8 @@ class DispatcherBackend(InfraBackend):
 
         task_id: str = result.get('task_id', '')
         if not task_id:
-            raise BackendError('Dispatcher did not return a task_id', status_code=502)
+            msg = 'Dispatcher did not return a task_id'
+            raise BackendError(msg, status_code=502)
 
         # Store the mapping so status() can look it up.
         self._tasks[job_name] = task_id
@@ -233,7 +238,7 @@ class DispatcherBackend(InfraBackend):
         """Return tracked Dispatcher tasks as pseudo-job entries."""
 
         result: list[dict[str, Any]] = []
-        for job_name, task_id in self._tasks.items():
+        for job_name in self._tasks:
             phase: str | None = self.read_job_phase(job_name, namespace)
             result.append(
                 {
@@ -275,8 +280,9 @@ class DispatcherBackend(InfraBackend):
     def delete_pod(self, pod_name: str, namespace: str) -> None:
         """Dispatcher backend cannot delete individual pods."""
 
+        msg = 'Pod deletion not supported via Dispatcher backend'
         raise BackendError(
-            'Pod deletion not supported via Dispatcher backend',
+            msg,
             status_code=501,
         )
 

@@ -7,8 +7,8 @@ configured Kubernetes namespace.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 router: APIRouter = APIRouter(prefix='/api', tags=['monitoring'])
 
-_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=UTC)
 """Fallback timestamp for events with all-None time fields."""
 
 
@@ -220,7 +220,7 @@ async def api_metrics(
 async def api_logs(
     pod_name: str,
     request: Request,
-    tail: int = Query(default=100, ge=1, le=500),
+    tail: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict[str, Any] | JSONResponse:
     """Return the last *tail* lines of a pod's logs (with timestamps)."""
 

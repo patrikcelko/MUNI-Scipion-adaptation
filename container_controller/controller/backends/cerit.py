@@ -4,13 +4,16 @@ CERIT backend
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 from kubernetes import client
 
-from controller.utilities import k8s
 from controller.backends import register_backend
 from controller.backends.k8s import K8sBackend
-from controller.utilities.config import Settings
+from controller.utilities import k8s
+
+if TYPE_CHECKING:
+    from controller.utilities.config import Settings
 
 logger: logging.Logger = logging.getLogger(__name__)
 

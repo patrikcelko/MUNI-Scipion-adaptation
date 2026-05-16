@@ -4,8 +4,9 @@ Test fixtures
 """
 
 import time
+from collections.abc import Generator
 from types import SimpleNamespace
-from typing import Any, Generator
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -63,7 +64,7 @@ def _reset_mocks() -> None:
             child.return_value = MagicMock()
 
 
-@pytest.fixture()
+@pytest.fixture
 def settings() -> Settings:
     """Return the test `Settings` instance."""
 
@@ -79,31 +80,30 @@ def settings() -> Settings:
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def backend(settings: Settings) -> K8sBackend:
     """Return a `K8sBackend` backed by mocked K8s clients."""
 
     return K8sBackend(settings)
 
 
-@pytest.fixture()
+@pytest.fixture
 def app(settings: Settings) -> FastAPI:
     """Create a fresh FastAPI app wired to test settings."""
 
-    application = create_app(settings)
-    return application
+    return create_app(settings)
 
 
-@pytest.fixture()
-def client(app: Any) -> Generator[TestClient, None, None]:
+@pytest.fixture
+def client(app: Any) -> Generator[TestClient]:
     """FastAPI `TestClient` backed by test mocks."""
 
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
-@pytest.fixture()
-def clear_known_jobs() -> Generator[None, None, None]:
+@pytest.fixture
+def clear_known_jobs() -> Generator[None]:
     """Clear the `_known_jobs` set before and after each test."""
 
     _known_jobs.clear()

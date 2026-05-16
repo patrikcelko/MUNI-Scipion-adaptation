@@ -62,7 +62,7 @@ def cleanup_finished_jobs(
                     result['deleted_cap'],
                     result['evicted'],
                 )
-        except Exception as exc:
-            logger.error('Cleanup error: %s', exc)
+        except Exception:
+            logger.exception('Cleanup error!', stack_info=True)
 
         time.sleep(interval)

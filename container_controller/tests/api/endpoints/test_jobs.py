@@ -9,17 +9,17 @@ import time as _time
 from collections import OrderedDict
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
 
 from controller import __version__, create_app
 from controller.api.endpoints.jobs import (
-    _build_tool_setup,
-    _known_jobs,
     _LIBNONE_SCRIPT,
     _MAX_KNOWN_JOBS,
+    _build_tool_setup,
+    _known_jobs,
 )
 from controller.utilities.config import Settings
 from tests.conftest import mock_batch
@@ -85,8 +85,8 @@ CTF_TOOLS = [
 ]
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_success(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_success(client: Any, clear_known_jobs: Any) -> None:
     """Job submission succeeds."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -120,8 +120,8 @@ def test_submit_empty_cmd(client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=[])
-def test_submit_no_matching_tool(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=[]))
+def test_submit_no_matching_tool(client: Any) -> None:
     """Submit with no matching tool returns 422."""
 
     resp = client.post(
@@ -133,9 +133,9 @@ def test_submit_no_matching_tool(_mock: Any, client: Any) -> None:
     assert resp.status_code == 422
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_with_gpu_resources(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Submit with GPU resources sets nvidia.com/gpu limit."""
 
@@ -155,9 +155,9 @@ def test_submit_with_gpu_resources(
     assert 'nvidia.com/gpu' in container.resources.limits
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_records_known_job(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Submit records job in _known_jobs."""
 
@@ -174,8 +174,8 @@ def test_submit_records_known_job(
     assert len(_known_jobs) == 1
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_pvc_volumes(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_pvc_volumes(client: Any, clear_known_jobs: Any) -> None:
     """PVC mode creates projects-vol and datasets-vol volumes."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -194,8 +194,8 @@ def test_submit_pvc_volumes(_mock: Any, client: Any, clear_known_jobs: Any) -> N
     assert 'datasets-vol' in vol_names
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_local_storage_mode(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_local_storage_mode(client: Any) -> None:
     """Local storage mode creates a hostPath volume."""
 
     local_settings = Settings(
@@ -220,8 +220,8 @@ def test_submit_local_storage_mode(_mock: Any, client: Any) -> None:
         assert 'projects-local' in vol_names
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=RELION_TOOLS)
-def test_submit_relion_setup(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=RELION_TOOLS))
+def test_submit_relion_setup(client: Any, clear_known_jobs: Any) -> None:
     """Relion protocols get RELION_HOME setup injected."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -241,8 +241,8 @@ def test_submit_relion_setup(_mock: Any, client: Any, clear_known_jobs: Any) -> 
     assert 'RELION_HOME' in cmd
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=CTF_TOOLS)
-def test_submit_ctffind_setup(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=CTF_TOOLS))
+def test_submit_ctffind_setup(client: Any, clear_known_jobs: Any) -> None:
     """CTFFind protocols get ctffind binary setup."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -262,9 +262,9 @@ def test_submit_ctffind_setup(_mock: Any, client: Any, clear_known_jobs: Any) ->
     assert 'ctffind' in cmd
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_cleanup_stale_outputs(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Stale output cleanup commands are injected."""
 
@@ -286,8 +286,8 @@ def test_submit_cleanup_stale_outputs(
     assert 'rm -f' in cmd
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_job_labels(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_job_labels(client: Any, clear_known_jobs: Any) -> None:
     """Job gets app=scipion-worker and tool labels."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -304,8 +304,8 @@ def test_submit_job_labels(_mock: Any, client: Any, clear_known_jobs: Any) -> No
     assert 'tool' in job.metadata.labels
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_ttl_seconds(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_ttl_seconds(client: Any, clear_known_jobs: Any) -> None:
     """Job spec includes ttl_seconds_after_finished from settings."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -321,8 +321,8 @@ def test_submit_ttl_seconds(_mock: Any, client: Any, clear_known_jobs: Any) -> N
     assert job.spec.ttl_seconds_after_finished == 300  # from test settings
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_submit_onedata_sidecar(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_submit_onedata_sidecar(client: Any) -> None:
     """OneData sidecar is injected when enabled."""
 
     od_settings = Settings(
@@ -349,9 +349,9 @@ def test_submit_onedata_sidecar(_mock: Any, client: Any) -> None:
         assert containers[1].name == 'oneclient'
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_backoff_limit_zero(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Job spec has backoff_limit=0 (no retries)."""
 
@@ -492,9 +492,9 @@ def test_known_jobs_is_ordered_dict(clear_known_jobs: Any) -> None:
     assert isinstance(_known_jobs, OrderedDict)
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=CTF_TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=CTF_TOOLS))
 def test_ctffind_setup_preserves_base_setup(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """CTFFind tool setup uses += to append, not = to overwrite."""
 
@@ -517,8 +517,8 @@ def test_ctffind_setup_preserves_base_setup(
     assert 'ctffind' in cmd
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_project_root_shell_injection_semicolon(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_project_root_shell_injection_semicolon(client: Any) -> None:
     """Semicolon in projectRoot is rejected."""
 
     resp = client.post(
@@ -532,8 +532,8 @@ def test_project_root_shell_injection_semicolon(_mock: Any, client: Any) -> None
     assert 'projectRoot' in resp.json()['error']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_project_root_shell_injection_backtick(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_project_root_shell_injection_backtick(client: Any) -> None:
     """Backtick in projectRoot is rejected."""
 
     resp = client.post(
@@ -546,8 +546,8 @@ def test_project_root_shell_injection_backtick(_mock: Any, client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_project_root_shell_injection_dollar(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_project_root_shell_injection_dollar(client: Any) -> None:
     """Dollar in projectRoot is rejected."""
 
     resp = client.post(
@@ -560,8 +560,8 @@ def test_project_root_shell_injection_dollar(_mock: Any, client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_project_root_path_traversal(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_project_root_path_traversal(client: Any) -> None:
     """Path traversal in projectRoot is rejected."""
 
     resp = client.post(
@@ -574,8 +574,8 @@ def test_project_root_path_traversal(_mock: Any, client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_project_root_valid(_mock: Any, client: Any, clear_known_jobs: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_project_root_valid(client: Any, clear_known_jobs: Any) -> None:
     """Valid projectRoot is accepted."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -589,9 +589,9 @@ def test_project_root_valid(_mock: Any, client: Any, clear_known_jobs: Any) -> N
     assert resp.status_code == 200
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_namespace_hardening_instance_param_ignored(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Submitted jobs always use the configured namespace, ignoring 'instance'."""
 
@@ -609,8 +609,8 @@ def test_namespace_hardening_instance_param_ignored(
     assert call_args[0][0] == 'test-ns'
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_run_dir_validation_dollar_rejected(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_run_dir_validation_dollar_rejected(client: Any) -> None:
     """Dollar in run_dir is rejected."""
 
     resp = client.post(
@@ -623,8 +623,8 @@ def test_run_dir_validation_dollar_rejected(_mock: Any, client: Any) -> None:
     assert 'run directory' in resp.json()['error']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_run_dir_validation_backtick_rejected(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_run_dir_validation_backtick_rejected(client: Any) -> None:
     """Backtick in run_dir is rejected."""
 
     resp = client.post(
@@ -636,8 +636,8 @@ def test_run_dir_validation_backtick_rejected(_mock: Any, client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_run_dir_validation_semicolon_rejected(_mock: Any, client: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_run_dir_validation_semicolon_rejected(client: Any) -> None:
     """Semicolon in run_dir is rejected."""
 
     resp = client.post(
@@ -649,9 +649,9 @@ def test_run_dir_validation_semicolon_rejected(_mock: Any, client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_run_dir_validation_normal_passes(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Normal run_dir passes validation."""
 
@@ -665,9 +665,9 @@ def test_run_dir_validation_normal_passes(
     assert resp.status_code == 200
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_zero_memory_clamped_to_512(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Zero memoryMb is clamped to 512."""
 
@@ -686,9 +686,9 @@ def test_submit_zero_memory_clamped_to_512(
     assert container.resources.limits['memory'] == '512Mi'
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_huge_memory_clamped_to_65536(
-    _mock: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Huge memoryMb is clamped to 65536."""
 
@@ -912,9 +912,9 @@ def test_submit_empty_body(client: Any) -> None:
     assert resp.status_code == 400
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_string_memory_uses_default(
-    _toolmap: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Non-numeric memoryMb uses default."""
 
@@ -929,9 +929,9 @@ def test_submit_string_memory_uses_default(
     assert resp.status_code == 200
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
 def test_submit_null_memory_uses_default(
-    _toolmap: Any, client: Any, clear_known_jobs: Any
+    client: Any, clear_known_jobs: Any
 ) -> None:
     """Null memoryMb uses default."""
 

@@ -6,6 +6,7 @@ requires-python = ">=3.13"
 
 dependencies = [
     "fastapi>=0.115.0",
+    "pydantic>=2.0.0",
     "uvicorn[standard]>=0.32.0",
     "kubernetes==35.0.0",
     "PyYAML==6.0.2",
@@ -23,5 +24,55 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
+[tool.ruff]
+line-length = 300
+
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",
+    "ANN",
+    "T20",      # flake8-print - prints are fine in utility scripts
+    "S",
+    "FBT",      # flake8-boolean-trap - boolean flags are idiomatic in config
+    "BLE001",   # blind-exception - controlled in backend catch-alls
+    "COM812",
+    "Q",
+    "PLR0913",  # too-many-arguments - K8s builders need many params
+    "PLR2004",
+    "TRY300",
+    "PGH003",
+    "PLW0603",
+    "TD002",
+    "TD003",
+    "FIX002",
+    "UP015",
+    "PGH004",
+    "ARG002",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "SLF001", "ARG"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+# The `kubernetes` client library ships no PEP 561 stubs. Every K8s object
+# attribute access produces "Unknown" which would require either authoring
+# a full stub package or hundreds of `cast()` / ignore comments.
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportPrivateUsage = "none"
+reportUnusedFunction = "none"
+reportUnknownParameterType = "none"

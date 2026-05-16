@@ -9,19 +9,22 @@ special tool container images.
 """
 
 __version__: str = '11.0.0'
-__all__: list[str] = ['create_app', '__version__']
+__all__: list[str] = [
+    '__version__',
+    'create_app'
+]
 
 import logging
 import threading
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from controller.api.endpoints import api_router
 from controller.backends import InfraBackend, create_backend
 from controller.tasks.cleanup import cleanup_finished_jobs
 from controller.utilities.config import Settings, get_settings
-from controller.api.endpoints import api_router
 
 logger: logging.Logger = logging.getLogger(__name__)
 

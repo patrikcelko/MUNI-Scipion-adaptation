@@ -3,6 +3,7 @@ K8s backend
 ===========
 """
 
+import contextlib
 import time
 from types import SimpleNamespace
 from typing import Any
@@ -263,7 +264,7 @@ def test_cleanup_thread_calls_sleep(mock_sleep: Any) -> None:
     """The loop calls time.sleep with the configured interval."""
 
     backend = _make_backend()
-    try:
+    with contextlib.suppress(StopIteration):
         cleanup_finished_jobs(
             backend=backend,
             namespace='test-ns',
@@ -271,8 +272,6 @@ def test_cleanup_thread_calls_sleep(mock_sleep: Any) -> None:
             interval=60,
             max_finished_jobs=3,
         )
-    except StopIteration:
-        pass
 
     mock_sleep.assert_called_once_with(60)
 
@@ -287,7 +286,7 @@ def test_cleanup_thread_runs_one_iteration(mock_sleep: Any) -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    try:
+    with contextlib.suppress(StopIteration):
         cleanup_finished_jobs(
             backend=backend,
             namespace='test-ns',
@@ -295,8 +294,6 @@ def test_cleanup_thread_runs_one_iteration(mock_sleep: Any) -> None:
             interval=60,
             max_finished_jobs=3,
         )
-    except StopIteration:
-        pass
 
     mock_batch.delete_namespaced_job.assert_called()
 
@@ -308,7 +305,7 @@ def test_cleanup_thread_handles_api_error(mock_sleep: Any) -> None:
     mock_batch.list_namespaced_job.side_effect = Exception('API down')
 
     backend = _make_backend()
-    try:
+    with contextlib.suppress(StopIteration):
         cleanup_finished_jobs(
             backend=backend,
             namespace='test-ns',
@@ -316,8 +313,6 @@ def test_cleanup_thread_handles_api_error(mock_sleep: Any) -> None:
             interval=60,
             max_finished_jobs=3,
         )
-    except StopIteration:
-        pass
 
 
 @patch('controller.tasks.cleanup.time.sleep', side_effect=StopIteration)
@@ -328,7 +323,7 @@ def test_cleanup_immediate_called_before_first_sleep(mock_sleep: Any) -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    try:
+    with contextlib.suppress(StopIteration):
         cleanup_finished_jobs(
             backend=backend,
             namespace='test-ns',
@@ -336,8 +331,6 @@ def test_cleanup_immediate_called_before_first_sleep(mock_sleep: Any) -> None:
             interval=60,
             max_finished_jobs=3,
         )
-    except StopIteration:
-        pass
 
     # If sleep were first, list_namespaced_job would never be called
     mock_batch.list_namespaced_job.assert_called_once()

@@ -8,26 +8,21 @@ cluster housekeeping information (disk, cleanup status, images).
 
 import logging
 import shutil
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from controller.api.endpoints.jobs import get_known_jobs_count
 from controller.backends import BackendError
-from controller.utilities.config import Settings
 from controller.utilities import get_namespace, is_valid_k8s_name
+
+if TYPE_CHECKING:
+    from controller.utilities.config import Settings
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 router: APIRouter = APIRouter(prefix='/api', tags=['admin'])
-
-
-def _get_known_jobs() -> dict[str, None]:
-    """Access the jobs module's `_known_jobs` without import-time coupling."""
-
-    from controller.api.endpoints.jobs import _known_jobs
-
-    return _known_jobs
 
 
 @router.get('/cleanup')
@@ -43,7 +38,7 @@ async def api_cleanup_status(request: Request) -> dict[str, Any]:
         'ttl_seconds': cfg.jobs_ttl,
         'check_interval': cfg.jobs_cleanup_interval,
         'max_finished_jobs': cfg.max_finished_jobs,
-        'known_jobs': len(_get_known_jobs()),
+        'known_jobs': get_known_jobs_count(),
     }
 
 

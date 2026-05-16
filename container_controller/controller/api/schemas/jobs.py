@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 class SubmitResponse(BaseModel):
     """Returned after a successful `POST /submit`."""
 
-    jobId: str = Field(
+    jobId: str = Field(  # noqa: N815 - this need to be in this case
         ...,
         description='Full Kubernetes Job name.',
     )
     """RFC 1123 compliant name, e.g. `scipion-job-1710000000123-a1b2c3`."""
 
-    jobNumber: str = Field(
+    jobNumber: str = Field(  # noqa: N815 - this need to be in this case
         ...,
         description='Job identifier (timestamp-ms + random hex suffix).',
     )

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from controller.backends import BackendError, _BACKENDS, create_backend
+from controller.backends import _BACKENDS, BackendError, create_backend
 from controller.backends.dispatcher import DispatcherBackend
 from controller.utilities.config import Settings
 
@@ -52,7 +52,7 @@ class _FakeResponse:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *_: Any) -> None:
+    def __exit__(self, *_: object) -> None:
         pass
 
 
@@ -116,8 +116,7 @@ def test_dispatcher_request_invalid_json_response_raises_backend_error(
 
     with pytest.raises(BackendError) as exc_info:
         be._request('GET', '/test')
-
-        assert exc_info.value.status_code == 502
+    assert exc_info.value.status_code == 502
 
 
 @patch('controller.backends.dispatcher.urllib.request.urlopen')
@@ -165,8 +164,7 @@ def test_dispatcher_request_http_error_raises_backend_error(
 
     with pytest.raises(BackendError) as exc_info:
         be._request('GET', '/test')
-
-        assert exc_info.value.status_code == 500
+    assert exc_info.value.status_code == 500
 
 
 @patch('controller.backends.dispatcher.urllib.request.urlopen')
@@ -180,8 +178,7 @@ def test_dispatcher_request_url_error_raises_backend_error_502(
 
     with pytest.raises(BackendError) as exc_info:
         be._request('GET', '/test')
-
-        assert exc_info.value.status_code == 502
+    assert exc_info.value.status_code == 502
 
 
 @patch('controller.backends.dispatcher.urllib.request.urlopen')

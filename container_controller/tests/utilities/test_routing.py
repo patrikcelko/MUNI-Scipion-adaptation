@@ -3,10 +3,10 @@ Tool routing
 ============
 """
 
-import os
 import tempfile
+from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 
@@ -210,8 +210,8 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_xmipp(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_xmipp() -> None:
     """Xmipp protocol routes to xmipp container."""
 
     result = choose_tool_by_protocol('XmippProtMovieGain', '/dev/null')
@@ -219,8 +219,8 @@ def test_choose_by_protocol_xmipp(_mock: Any) -> None:
     assert 'xmipp' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_relion(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_relion() -> None:
     """Relion protocol routes to relion container."""
 
     result = choose_tool_by_protocol('ProtRelionRefine3D', '/dev/null')
@@ -228,8 +228,8 @@ def test_choose_by_protocol_relion(_mock: Any) -> None:
     assert 'relion' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_ctffind(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_ctffind() -> None:
     """CTFFind protocol routes to ctffind4 container."""
 
     result = choose_tool_by_protocol('CistemProtCTFFind', '/dev/null')
@@ -237,8 +237,8 @@ def test_choose_by_protocol_ctffind(_mock: Any) -> None:
     assert 'ctffind4' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_gctf(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_gctf() -> None:
     """Gctf protocol routes to gctf container."""
 
     result = choose_tool_by_protocol('ProtGctf', '/dev/null')
@@ -246,8 +246,8 @@ def test_choose_by_protocol_gctf(_mock: Any) -> None:
     assert 'gctf' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_motioncor(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_motioncor() -> None:
     """MotionCorr protocol routes to motioncor2 container."""
 
     result = choose_tool_by_protocol('ProtMotionCorr', '/dev/null')
@@ -255,8 +255,8 @@ def test_choose_by_protocol_motioncor(_mock: Any) -> None:
     assert 'motioncor2' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_eman2(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_eman2() -> None:
     """EMAN protocol routes to eman2 container."""
 
     result = choose_tool_by_protocol('EmanProtBoxing', '/dev/null')
@@ -264,8 +264,8 @@ def test_choose_by_protocol_eman2(_mock: Any) -> None:
     assert 'eman2' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_unknown_falls_back_to_scipion(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_unknown_falls_back_to_scipion() -> None:
     """Unknown protocol falls back to scipion3-remote container."""
 
     result = choose_tool_by_protocol('SomeUnknownProtocol', '/dev/null')
@@ -273,8 +273,8 @@ def test_choose_by_protocol_unknown_falls_back_to_scipion(_mock: Any) -> None:
     assert 'scipion3-remote' in result['image']
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_gpu_override_xmipp_movie_corr(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_gpu_override_xmipp_movie_corr() -> None:
     """XmippProtMovieCorr gets GPU override."""
 
     result = choose_tool_by_protocol('XmippProtMovieCorr', '/dev/null')
@@ -282,8 +282,8 @@ def test_choose_by_protocol_gpu_override_xmipp_movie_corr(_mock: Any) -> None:
     assert result['needsGpu'] is True
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_gpu_override_gctf(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_gpu_override_gctf() -> None:
     """ProtGctf gets GPU override."""
 
     result = choose_tool_by_protocol('ProtGctf', '/dev/null')
@@ -297,15 +297,15 @@ def test_choose_by_protocol_empty_protocol_name() -> None:
     assert choose_tool_by_protocol('', '/dev/null') is None
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=[])
-def test_choose_by_protocol_empty_toolmap(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=[]))
+def test_choose_by_protocol_empty_toolmap() -> None:
     """Empty toolmap returns None."""
 
     assert choose_tool_by_protocol('XmippProtMovieGain', '/dev/null') is None
 
 
-@patch('controller.utilities.routing.load_toolmap', return_value=TOOLS)
-def test_choose_by_protocol_returns_copy_not_original(_mock: Any) -> None:
+@patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
+def test_choose_by_protocol_returns_copy_not_original() -> None:
     """Returned dict must be a copy so mutations don't affect cache."""
 
     result = choose_tool_by_protocol('XmippProtMovieGain', '/dev/null')
@@ -376,7 +376,7 @@ def test_choose_tool_copy_returns_dict_copy() -> None:
         assert result2 is not None
         assert 'MUTATED' not in result2
     finally:
-        os.unlink(path)
+        Path(path).unlink()
 
 
 def test_choose_tool_copy_regex_anchors_removed_from_protocol_mappings() -> None:

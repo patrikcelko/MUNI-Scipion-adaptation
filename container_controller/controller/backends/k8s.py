@@ -5,20 +5,21 @@ K8s backend
 
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from kubernetes import client
 from kubernetes.client.exceptions import ApiException
 
-from controller.utilities import k8s
 from controller.backends import BackendError, InfraBackend, register_backend
-from controller.utilities.config import Settings
-from controller.utilities import age, job_phase, parse_cpu, parse_mem
+from controller.utilities import age, job_phase, k8s, parse_cpu, parse_mem
+
+if TYPE_CHECKING:
+    from controller.utilities.config import Settings
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=UTC)
 """Fallback timestamp for events with all-None time fields."""
 
 
@@ -232,8 +233,6 @@ class K8sBackend(InfraBackend):
         pod_metrics: list[dict[str, Any]] = []
 
         try:
-            if k8s.custom_api is None:
-                raise RuntimeError('metrics-server not available')
             nodes = k8s.custom_api.list_cluster_custom_object(
                 'metrics.k8s.io', 'v1beta1', 'nodes'
             )
@@ -265,8 +264,6 @@ class K8sBackend(InfraBackend):
             node_metrics = [{'error': str(exc)}]
 
         try:
-            if k8s.custom_api is None:
-                raise RuntimeError('metrics-server not available')
             pods = k8s.custom_api.list_namespaced_custom_object(
                 'metrics.k8s.io', 'v1beta1', namespace, 'pods'
             )

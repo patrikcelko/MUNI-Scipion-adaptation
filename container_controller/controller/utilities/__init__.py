@@ -6,6 +6,7 @@ Utilities
 import math
 import re
 import time
+from pathlib import Path
 from typing import Any, Protocol, cast
 
 import yaml
@@ -24,7 +25,7 @@ def load_yaml(path: str) -> dict[str, Any] | list[Any] | None:
     """Load a YAML file, returning None when the file does not exist."""
 
     try:
-        with open(path, 'r', encoding='utf-8') as fh:
+        with Path(path).open(encoding='utf-8') as fh:
             return yaml.safe_load(fh) or {}
     except OSError:
         return None
@@ -154,4 +155,4 @@ def is_safe_path(path: str) -> bool:
 def get_namespace(request: Any) -> str:
     """Return the active namespace from `app.state.settings`."""
 
-    return cast(str, request.app.state.settings.namespace)
+    return cast('str', request.app.state.settings.namespace)

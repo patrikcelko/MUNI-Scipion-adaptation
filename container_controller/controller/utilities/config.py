@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -16,8 +17,7 @@ def _read_ns_file() -> str | None:
     """Try to read the in-cluster namespace file."""
 
     try:
-        with open(
-            '/var/run/secrets/kubernetes.io/serviceaccount/namespace',
+        with Path('/var/run/secrets/kubernetes.io/serviceaccount/namespace').open(
             encoding='utf-8',
         ) as fh:
             return fh.read().strip() or None

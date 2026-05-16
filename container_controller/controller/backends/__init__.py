@@ -6,7 +6,7 @@ Infrastructure backend abstraction layer.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from controller.utilities.config import Settings
@@ -124,11 +124,12 @@ def register_backend(name: str, cls: type[InfraBackend]) -> None:
 def create_backend(name: str, settings: 'Settings') -> InfraBackend:
     """Instantiate the backend registered under name."""
 
-    import controller.backends.k8s  # noqa
-    import controller.backends.cerit  # noqa
-    import controller.backends.dispatcher  # noqa
+    import controller.backends.cerit  # type: ignore[reportUnusedImport]  # noqa: PLC0415
+    import controller.backends.dispatcher  # type: ignore[reportUnusedImport]  # noqa: PLC0415
+    import controller.backends.k8s  # type: ignore[reportUnusedImport]  # noqa: F401, PLC0415
 
     if name not in _BACKENDS:
-        raise ValueError(f'Unknown backend: {name!r}. Available: {sorted(_BACKENDS)}')
+        msg = f'Unknown backend: {name!r}. Available: {sorted(_BACKENDS)}'
+        raise ValueError(msg)
 
     return _BACKENDS[name](settings)

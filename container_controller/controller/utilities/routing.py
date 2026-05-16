@@ -7,8 +7,8 @@ it to the correct specialized Docker image (`xmipp`, `relion`, …).
 """
 
 import logging
-import os
 import re
+from pathlib import Path
 from typing import Any
 
 from controller.utilities import load_yaml
@@ -42,7 +42,7 @@ def load_toolmap(toolmap_path: str) -> list[dict[str, Any]]:
     global _toolmap_cache, _toolmap_mtime
 
     try:
-        mtime = os.path.getmtime(toolmap_path)
+        mtime = Path(toolmap_path).stat().st_mtime
     except OSError:
         mtime = 0.0
 

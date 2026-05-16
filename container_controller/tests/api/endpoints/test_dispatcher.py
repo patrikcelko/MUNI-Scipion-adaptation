@@ -7,7 +7,7 @@ import json
 import re
 import urllib.error
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -141,9 +141,9 @@ def test_import_workflow_download_failure(mock_urlopen: Any, client: Any) -> Non
 
 @patch(
     'controller.api.endpoints.dispatcher._is_private_host',
-    return_value=True,
+    new=Mock(return_value=True),
 )
-def test_ssrf_private_ip_blocked(_mock: Any, client: Any) -> None:
+def test_ssrf_private_ip_blocked(client: Any) -> None:
     """_is_private_host blocks requests to internal networks."""
 
     resp = client.post(
@@ -156,9 +156,9 @@ def test_ssrf_private_ip_blocked(_mock: Any, client: Any) -> None:
 
 @patch(
     'controller.api.endpoints.dispatcher._is_private_host',
-    return_value=True,
+    new=Mock(return_value=True),
 )
-def test_ssrf_localhost_blocked(_mock: Any, client: Any) -> None:
+def test_ssrf_localhost_blocked(client: Any) -> None:
     """Localhost is blocked as private host."""
 
     resp = client.post(

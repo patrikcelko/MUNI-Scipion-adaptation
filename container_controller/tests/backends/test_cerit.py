@@ -9,13 +9,13 @@ from typing import Any
 import pytest
 from kubernetes.client.exceptions import ApiException
 
-from controller.backends import BackendError, _BACKENDS, create_backend
+from controller.backends import _BACKENDS, BackendError, create_backend
 from controller.backends.cerit import (
-    CeritBackend,
     _CERIT_DEFAULT_CPU_LIMIT,
     _CERIT_DEFAULT_CPU_REQUEST,
     _CERIT_DEFAULT_MEM_REQUEST_MB,
     _CERIT_GPU_RESOURCE,
+    CeritBackend,
 )
 from controller.utilities.config import Settings
 from tests.conftest import mock_batch, mock_core
@@ -301,11 +301,9 @@ def test_cerit_lifecycle_delete_job_api_error() -> None:
         status=404, reason='Not Found'
     )
 
-    try:
+    with pytest.raises(BackendError) as exc_info:
         backend.delete_job('j1', 'cerit-ns')
-        pytest.fail('Expected BackendError')
-    except BackendError as exc:
-        assert exc.status_code == 404
+    assert exc_info.value.status_code == 404
 
 
 def test_cerit_monitoring_list_pods_returns_empty() -> None:
@@ -385,11 +383,9 @@ def test_cerit_admin_delete_pod_not_found() -> None:
         status=404, reason='Not Found'
     )
 
-    try:
+    with pytest.raises(BackendError) as exc_info:
         backend.delete_pod('pod-1', 'cerit-ns')
-        pytest.fail('Expected BackendError')
-    except BackendError as exc:
-        assert exc.status_code == 404
+    assert exc_info.value.status_code == 404
 
 
 def test_cerit_cleanup_empty() -> None:
