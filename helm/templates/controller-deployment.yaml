@@ -69,6 +69,8 @@ spec:
           value: '{{ toJson ($ctl.nodeSelectorJson | default (dict)) }}'
         - name: TOLERATIONS_JSON
           value: '{{ toJson ($ctl.tolerationsJson | default (list)) }}'
+        - name: VNC_PORT
+          value: "{{ default 31335 $ctl.vncNodePort }}"
         volumeMounts:
         - name: config
           mountPath: /config

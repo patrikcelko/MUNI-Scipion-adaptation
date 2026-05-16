@@ -22,11 +22,14 @@ class _HasTimestamp(Protocol):
 
 
 def load_yaml(path: str) -> dict[str, Any] | list[Any] | None:
-    """Load a YAML file, returning None when the file does not exist."""
+    """Load a YAML file. Returns the parsed value on success, `{}` when YAML is empty
+    or null, or `None` when the file does not exist or cannot be read.
+    """
 
     try:
         with Path(path).open(encoding='utf-8') as fh:
-            return yaml.safe_load(fh) or {}
+            parsed = yaml.safe_load(fh)
+            return parsed if parsed is not None else {}
     except OSError:
         return None
 

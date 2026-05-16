@@ -208,23 +208,32 @@ def test_cleanup_cap_zero_deletes_all_finished() -> None:
 
 
 def test_delete_evicted_deletes_evicted_pods() -> None:
-    """Evicted pods are deleted, other failure reasons are left alone."""
+    """Evicted and OOMKilled pods are deleted, other failure reasons are left alone."""
 
     evicted = SimpleNamespace(
         metadata=SimpleNamespace(name='evicted-pod'),
         status=SimpleNamespace(phase='Failed', reason='Evicted'),
     )
-    normal = SimpleNamespace(
-        metadata=SimpleNamespace(name='normal-pod'),
+
+    oomkilled = SimpleNamespace(
+        metadata=SimpleNamespace(name='oom-pod'),
         status=SimpleNamespace(phase='Failed', reason='OOMKilled'),
     )
-    mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[evicted, normal])
+
+    other = SimpleNamespace(
+        metadata=SimpleNamespace(name='other-pod'),
+        status=SimpleNamespace(phase='Failed', reason='NodeShutdown'),
+    )
+
+    mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[evicted, oomkilled, other])
     mock_core.delete_namespaced_pod.return_value = None
 
     count = K8sBackend._delete_evicted_pods('test-ns')
+    assert count == 2
 
-    assert count == 1
-    mock_core.delete_namespaced_pod.assert_called_once_with('evicted-pod', 'test-ns')
+    deleted_names = {c.args[0] for c in mock_core.delete_namespaced_pod.call_args_list}
+    assert deleted_names == {'evicted-pod', 'oom-pod'}
+    assert 'other-pod' not in deleted_names
 
 
 def test_delete_evicted_no_evicted_pods() -> None:

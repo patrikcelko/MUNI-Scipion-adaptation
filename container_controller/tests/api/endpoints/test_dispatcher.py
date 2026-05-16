@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 from fastapi.testclient import TestClient
 
 from controller import create_app
-from controller.api.endpoints.dispatcher import _is_private_host
+from controller.api.endpoints.dispatcher import _resolve_to_public_ip
 from controller.utilities.config import Settings
 
 
@@ -136,11 +136,11 @@ def test_import_workflow_download_failure(mock_urlopen: Any, client: Any) -> Non
 
 
 @patch(
-    'controller.api.endpoints.dispatcher._is_private_host',
-    new=Mock(return_value=True),
+    'controller.api.endpoints.dispatcher._resolve_to_public_ip',
+    new=Mock(return_value=None),
 )
 def test_ssrf_private_ip_blocked(client: Any) -> None:
-    """_is_private_host blocks requests to internal networks."""
+    """_resolve_to_public_ip returns None for internal networks."""
 
     resp = client.post(
         '/import_workflow',
@@ -151,11 +151,11 @@ def test_ssrf_private_ip_blocked(client: Any) -> None:
 
 
 @patch(
-    'controller.api.endpoints.dispatcher._is_private_host',
-    new=Mock(return_value=True),
+    'controller.api.endpoints.dispatcher._resolve_to_public_ip',
+    new=Mock(return_value=None),
 )
 def test_ssrf_localhost_blocked(client: Any) -> None:
-    """Localhost is blocked as private host."""
+    """_resolve_to_public_ip returns None for localhost."""
 
     resp = client.post(
         '/import_workflow',
@@ -176,27 +176,59 @@ def test_ssrf_no_hostname_blocked(client: Any) -> None:
 
 
 def test_is_private_host_loopback() -> None:
-    """Loopback address is private."""
+    """Loopback address is not resolved as public."""
 
-    assert _is_private_host('127.0.0.1') is True
+    assert _resolve_to_public_ip('127.0.0.1') is None
 
 
 def test_is_private_host_private_10() -> None:
-    """10.x.x.x range is private."""
+    """10.x.x.x range is not resolved as public."""
 
-    assert _is_private_host('10.0.0.1') is True
+    assert _resolve_to_public_ip('10.0.0.1') is None
 
 
 def test_is_private_host_private_192() -> None:
-    """192.168.x.x range is private."""
+    """192.168.x.x range is not resolved as public."""
 
-    assert _is_private_host('192.168.1.1') is True
+    assert _resolve_to_public_ip('192.168.1.1') is None
 
 
 def test_is_private_host_unresolvable_rejected() -> None:
-    """Unresolvable hostname is treated as private."""
+    """Unresolvable hostname returns None."""
 
-    assert _is_private_host('this-host-does-not-exist.invalid') is True
+    assert _resolve_to_public_ip('this-host-does-not-exist.invalid') is None
+
+
+@patch('urllib.request.urlopen')
+def test_import_workflow_duplicate_project_returns_409(mock_urlopen: Any, tmp_path: Any) -> None:
+    """Second import with the same project_name returns 409 Conflict."""
+
+    workflow = [{'protocol': 'XmippProtMovieGain'}]
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(workflow).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_urlopen.return_value = mock_resp
+
+    settings = Settings(
+        namespace='test-ns',
+        storage_mode='local',
+        local_path=str(tmp_path),
+        toolmap_path='/dev/null',
+    )
+    app = create_app(settings)
+    payload = {
+        'workflow_url': 'https://example.com/workflow.json',
+        'project_name': 'DuplicateProject',
+    }
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        resp1 = c.post('/import_workflow', json=payload)
+        assert resp1.status_code == 200
+
+        resp2 = c.post('/import_workflow', json=payload)
+        assert resp2.status_code == 409
+        assert 'already exists' in resp2.json()['error']
 
 
 def test_dispatcher_invalid_json_plain_text_body(client: Any) -> None:

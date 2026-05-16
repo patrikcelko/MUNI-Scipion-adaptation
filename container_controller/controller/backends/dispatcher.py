@@ -21,6 +21,7 @@ Configuration:
 import contextlib
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -41,8 +42,11 @@ class DispatcherBackend(InfraBackend):
         self._token: str = settings.dispatcher_token
         self._timeout: int = settings.dispatcher_timeout
 
-        # task_id -> dispatcher task mapping (local memory)
+        # task mapping: job_name -> task_id
         self._tasks: dict[str, str] = {}
+
+        # submission timestamps for TTL-based cleanup
+        self._task_submit_time: dict[str, float] = {}
 
     def _request(
         self,
@@ -174,6 +178,7 @@ class DispatcherBackend(InfraBackend):
 
         # Store the mapping so status() can look it up.
         self._tasks[job_name] = task_id
+        self._task_submit_time[job_name] = time.time()
         logger.info('Submitted job %s to Dispatcher -> task %s', job_name, task_id)
 
     def read_job_phase(self, job_name: str, namespace: str) -> str | None:
@@ -210,14 +215,18 @@ class DispatcherBackend(InfraBackend):
         return 'RUNNING'
 
     def delete_job(self, job_name: str, namespace: str) -> None:
-        """Remove the task from local tracking. The Dispatcher does not
-        expose a cancel/delete endpoint by default - we simply stop
-        tracking the task locally.
+        """Remove the task from local tracking. The Dispatcher does not support remote task cancellation, so this
+        is a best-effort cleanup that allows the controller to forget about the job. The actual task will still
+        run to completion on the Dispatcher side.
         """
 
         task_id: str | None = self._tasks.pop(job_name, None)
+        self._task_submit_time.pop(job_name, None)
         if task_id:
-            logger.info('Removed Dispatcher task %s for job %s', task_id, job_name)
+            logger.warning(
+                'Removed Dispatcher task %s for job %s from local tracking. ',
+                task_id, job_name,
+            )
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
         """Dispatcher backend has no pod-level visibility."""
@@ -283,24 +292,41 @@ class DispatcherBackend(InfraBackend):
         jobs_ttl: int,
         max_finished_jobs: int,
     ) -> dict[str, int]:
-        """Remove completed tasks from local tracking. The Dispatcher manages its
-        own Redis-based task lifecycle, this only cleans up the local in-memory mapping.
+        """Remove completed tasks from local tracking. Applies two removal strategies:
+            - TTL-based: any DONE/FAILED task whose submission time is older
+              than jobs_ttl seconds is removed.
+            - Cap-based: if the remaining finished tasks exceed
+              max_finished_jobs, the oldest surplus entries are removed.
         """
 
-        to_remove: list[str] = []
+        now: float = time.time()
+        deleted_ttl: int = 0
+        remaining_finished: list[str] = []
 
         for job_name in list(self._tasks):
             phase: str | None = self.read_job_phase(job_name, namespace)
-            if phase in ('DONE', 'FAILED'):
-                to_remove.append(job_name)
+            if phase not in ('DONE', 'FAILED'):
+                continue
 
-        removed: int = 0
-        if max_finished_jobs >= 0 and len(to_remove) > max_finished_jobs:
-            removed = len(to_remove) - max_finished_jobs
-            for name in to_remove[:removed]:
+            submit_ts: float = self._task_submit_time.get(job_name, 0.0)
+            if jobs_ttl > 0 and (now - submit_ts) > jobs_ttl:
+                self._tasks.pop(job_name, None)
+                self._task_submit_time.pop(job_name, None)
+                deleted_ttl += 1
+            else:
+                remaining_finished.append(job_name)
+
+        # Cap-based removal of the oldest surplus finished tasks.
+        deleted_cap: int = 0
+        if max_finished_jobs >= 0 and len(remaining_finished) > max_finished_jobs:
+            surplus = len(remaining_finished) - max_finished_jobs
+
+            for name in remaining_finished[:surplus]:
                 self._tasks.pop(name, None)
+                self._task_submit_time.pop(name, None)
+                deleted_cap += 1
 
-        return {'deleted_ttl': 0, 'deleted_cap': removed, 'evicted': 0}
+        return {'deleted_ttl': deleted_ttl, 'deleted_cap': deleted_cap, 'evicted': 0}
 
 
 register_backend('dispatcher', DispatcherBackend)

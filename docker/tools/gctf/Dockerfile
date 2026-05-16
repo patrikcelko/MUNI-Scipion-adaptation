@@ -30,6 +30,10 @@ RUN pip3 install --no-cache-dir scipion-installer && \
 # Install Gctf plugin (downloads Gctf binary)
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-gctf
 
+# Patch _libNone.Image (avoids AttributeError in container)
+COPY patch_libnone.py /tmp/patch_libnone.py
+RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
+
 # Runtime stage
 
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04

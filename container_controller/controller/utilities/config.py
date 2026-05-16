@@ -94,6 +94,22 @@ def _safe_int(env_var: str, default: int) -> int:
         return default
 
 
+def _safe_str_dict(env_var: str, value: dict[str, Any]) -> dict[str, str]:
+    """Validate that all values in a parsed dict are strings. K8s node selectors require
+    `dict[str, str]`. Returns an empty dict and logs a warning when the constraint is
+    violated.
+    """
+
+    if not all(isinstance(v, str) for v in value.values()):
+        logger.warning(
+            '%s values must all be strings (K8s label format); using empty dict',
+            env_var,
+        )
+        return {}
+
+    return value
+
+
 def _safe_json(env_var: str, default: Any, expected_type: type) -> Any:
     """Read a JSON value of expected_type from env_var, falling back to default."""
 
@@ -133,7 +149,7 @@ def get_settings() -> Settings:
         local_path=os.environ.get('LOCAL_PATH', '/srv/scipion/projects'),
         projects_pvc=os.environ.get('PROJECTS_PVC', 'scipion-projects'),
         pvc_sub_path=os.environ.get('PVC_SUB_PATH', 'projects'),
-        node_selector_json=_safe_json('NODE_SELECTOR_JSON', {}, dict),
+        node_selector_json=_safe_str_dict('NODE_SELECTOR_JSON', _safe_json('NODE_SELECTOR_JSON', {}, dict)),
         tolerations_json=_safe_json('TOLERATIONS_JSON', [], list),
         onedata_enabled=(os.environ.get('ONEDATA_ENABLED', 'false').lower() == 'true'),
         oneclient_image=os.environ.get('ONECLIENT_IMAGE', 'onedata/oneclient:latest'),

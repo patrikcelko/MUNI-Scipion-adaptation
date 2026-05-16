@@ -4,6 +4,7 @@ Dispatcher endpoint
 """
 
 import asyncio
+import concurrent.futures
 import ipaddress
 import json
 import logging
@@ -14,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -28,23 +29,39 @@ logger = logging.getLogger(__name__)
 router: APIRouter = APIRouter(tags=['dispatcher'])
 
 
-def _is_private_host(hostname: str) -> bool:
-    """Return True if hostname resolves to a private/loopback address."""
+def _resolve_to_public_ip(hostname: str, timeout: float = 5.0) -> str | None:
+    """Resolve *hostname* to its first public IP."""
 
     try:
-        for _family, _type, _proto, _canon, sockaddr in socket.getaddrinfo(
-            hostname,
-            None,
-            socket.AF_UNSPEC,
-            socket.SOCK_STREAM,
-        ):
-            ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local:
-                return True
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(
+                socket.getaddrinfo,
+                hostname,
+                None,
+                socket.AF_UNSPEC,
+                socket.SOCK_STREAM,
+            )
+            addrs = future.result(timeout=timeout)
+    except (socket.gaierror, OSError, concurrent.futures.TimeoutError):
+        return None
 
-    except socket.gaierror:
-        return True  # unresolvable -> reject
-    return False
+    if not addrs:
+        return None
+
+    first_ip: str | None = None
+    for _family, _type, _proto, _canon, sockaddr in addrs:
+        addr = sockaddr[0]
+        if not isinstance(addr, str):
+            continue  # AF_PACKET / AF_LINK
+
+        ip = ipaddress.ip_address(addr)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return None
+
+        if first_ip is None:
+            first_ip = addr
+
+    return first_ip
 
 
 _MAX_WORKFLOW_BYTES: int = 10 * 1024 * 1024  # 10 MB
@@ -62,15 +79,28 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
             status_code=400,
         )
 
-    if not parsed.hostname or _is_private_host(parsed.hostname):
+    resolved_ip = _resolve_to_public_ip(parsed.hostname) if parsed.hostname else None
+    if not parsed.hostname or resolved_ip is None:
         return JSONResponse(
             {'error': 'workflow_url must not target private networks'},
             status_code=400,
         )
 
+    ip_str = f'[{resolved_ip}]' if ':' in resolved_ip else resolved_ip
+    port_part = f':{parsed.port}' if parsed.port else ''
+
+    safe_url = urlunparse((
+        parsed.scheme,
+        f'{ip_str}{port_part}',
+        parsed.path,
+        parsed.params,
+        parsed.query,
+        parsed.fragment,
+    ))
     try:
-        req = urllib.request.Request(workflow_url, method='GET')
+        req = urllib.request.Request(safe_url, method='GET')
         req.add_header('User-Agent', 'Scipion-Controller/1.0')
+        req.add_header('Host', parsed.hostname)  # required for SNI / virtual hosting
         with urllib.request.urlopen(req, timeout=30) as resp:
             raw: str = resp.read(_MAX_WORKFLOW_BYTES + 1).decode('utf-8')
 
@@ -81,7 +111,7 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
             )
 
         workflow_json: Any = json.loads(raw)
-    except (urllib.error.URLError, ValueError, json.JSONDecodeError) as exc:
+    except (urllib.error.URLError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         return JSONResponse(
             {'error': f'Failed to download workflow: {exc}'},
             status_code=400,
@@ -96,7 +126,7 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
     return workflow_json
 
 
-@router.post('/import_workflow', response_model=ImportWorkflowResponse, responses={400: {'model': ErrorResponse}})
+@router.post('/import_workflow', response_model=ImportWorkflowResponse, responses={400: {'model': ErrorResponse}, 409: {'model': ErrorResponse}})
 async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
     """Import a Scipion workflow JSON from a URL into a new project."""
 
@@ -118,9 +148,10 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
 
     project_name: str = re.sub(r'[^A-Za-z0-9_-]', '_', data.get('project_name', 'DispatcherProject'))[:64]
 
-    result = _fetch_workflow_json(workflow_url)
+    result = await asyncio.to_thread(_fetch_workflow_json, workflow_url)
     if isinstance(result, JSONResponse):
         return result
+
     workflow_json: list[Any] = result
 
     # Persist workflow file (all blocking I/O offloaded to a thread).
@@ -130,10 +161,16 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
 
     def _persist() -> None:
         workflows_dir.mkdir(parents=True, exist_ok=True)
-        with workflow_path.open('w', encoding='utf-8') as fh:
+        with workflow_path.open('x', encoding='utf-8') as fh:
             json.dump(workflow_json, fh)
 
-    await asyncio.to_thread(_persist)
+    try:
+        await asyncio.to_thread(_persist)
+    except FileExistsError:
+        return JSONResponse(
+            {'error': f'workflow for project {project_name!r} already exists'},
+            status_code=409,
+        )
 
     logger.info(
         'Imported workflow %s (%d protocols) from %s',
@@ -142,10 +179,10 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
         workflow_url,
     )
 
-    vnc_host: str = os.environ.get(
-        'VNC_HOST',
-        request.headers.get('host', 'localhost').split(':')[0],
-    )
+    # VNC_HOST should be set via Helm / env var. Do NOT fall back to the
+    # user-controlled Host request header, that would allow a Host-header
+    # injection to generate a phishing vnc_url.
+    vnc_host: str = os.environ.get('VNC_HOST', 'localhost')
     vnc_port: str = os.environ.get('VNC_PORT', '31335')
 
     return {

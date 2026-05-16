@@ -76,8 +76,22 @@ check_tools() {
 do_build_tools() {
     local tool="$1"
     local tool_dir="$TOOLS_DIR/$tool"
+    local common_patch="$TOOLS_DIR/common/patch_libnone.py"
+    local copied_patch=""
+
+    # If the tool Dockerfile uses patch_libnone.py, stage the shared copy into
+    # the tool build context for the duration of the build.
+    if grep -q "COPY patch_libnone.py" "$tool_dir/Dockerfile" 2>/dev/null; then
+        cp "$common_patch" "$tool_dir/patch_libnone.py"
+        copied_patch="$tool_dir/patch_libnone.py"
+    fi
 
     do_build "$tool" "$tool_dir/Dockerfile" "$tool_dir"
+    local rc=$?
+
+    [[ -n "$copied_patch" ]] && rm -f "$copied_patch"
+
+    return $rc
 }
 
 # Build Docker images for all resolved tools.

@@ -35,6 +35,10 @@ RUN pip3 install --no-cache-dir scipion-installer && \
 # Install EMAN2 plugin with binaries (conda-based)
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-eman2
 
+# Patch _libNone.Image (avoids AttributeError in container)
+COPY patch_libnone.py /tmp/patch_libnone.py
+RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
+
 # Clean conda caches (saves hundreds of MB)
 RUN conda clean --all --yes && \
     rm -rf /opt/miniconda/pkgs/* /root/.cache/pip

@@ -56,6 +56,10 @@ RUN pip3 install --no-cache-dir scipion-installer && \
 # Install MotionCor2 plugin
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-motioncorr --noBin
 
+# Patch _libNone.Image (avoids AttributeError in container)
+COPY patch_libnone.py /tmp/patch_libnone.py
+RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
+
 # Verify installation
 RUN ${SCIPION_HOME}/scipion3 printenv | grep MOTIONCOR || true
 

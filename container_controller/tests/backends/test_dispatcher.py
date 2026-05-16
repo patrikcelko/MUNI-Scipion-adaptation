@@ -5,6 +5,7 @@ Dispatcher backend
 
 import http.client
 import json
+import time
 import urllib.error
 from io import BytesIO
 from typing import Any, Self
@@ -480,9 +481,10 @@ def test_dispatcher_cleanup_removes_done_tasks_over_cap(
 
     mock_urlopen.return_value = _FakeResponse({'status': 'SUCCESS'})
     be = _make_backend()
-    be._tasks['j1'] = 't1'
-    be._tasks['j2'] = 't2'
-    be._tasks['j3'] = 't3'
+    now = time.time()
+    for jname, tid in [('j1', 't1'), ('j2', 't2'), ('j3', 't3')]:
+        be._tasks[jname] = tid
+        be._task_submit_time[jname] = now
 
     result = be.cleanup_once(namespace='ns', jobs_ttl=300, max_finished_jobs=1)
     assert result['deleted_cap'] == 2
@@ -511,8 +513,10 @@ def test_dispatcher_cleanup_disabled_when_max_negative(
 
     mock_urlopen.return_value = _FakeResponse({'status': 'SUCCESS'})
     be = _make_backend()
-    be._tasks['j1'] = 't1'
-    be._tasks['j2'] = 't2'
+    now = time.time()
+    for jname, tid in [('j1', 't1'), ('j2', 't2')]:
+        be._tasks[jname] = tid
+        be._task_submit_time[jname] = now
 
     result = be.cleanup_once(namespace='ns', jobs_ttl=300, max_finished_jobs=-1)
     assert result['deleted_cap'] == 0

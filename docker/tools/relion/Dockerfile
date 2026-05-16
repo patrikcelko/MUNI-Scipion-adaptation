@@ -69,6 +69,10 @@ RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-relion --noBin
 RUN relion_refine --version 2>&1 | head -1 && \
     echo "Relion CPU build verified"
 
+# Patch _libNone.Image (avoids AttributeError in container)
+COPY patch_libnone.py /tmp/patch_libnone.py
+RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
+
 # Create directories for data
 RUN mkdir -p /projects /data /datasets && \
     chmod 777 /projects /data /datasets

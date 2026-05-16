@@ -16,7 +16,7 @@ controller:
 
   storageMode: "pvc"
   projectsPVC: "scipion-scipion3-remote-data"
-  localPath: "/srv/scipion/projects"
+  localPath: "/projects"
   jobsTTL: 600
   jobsCleanupInterval: 120
 
@@ -30,3 +30,6 @@ controller:
 
   nodeSelectorJson: {}
   tolerationsJson: {}
+
+  # NodePort exposed by the GUI service for noVNC access.
+  vncNodePort: 31335

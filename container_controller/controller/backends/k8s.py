@@ -111,8 +111,11 @@ class K8sBackend(InfraBackend):
     def read_job_phase(self, job_name: str, namespace: str) -> str | None:
         try:
             job = k8s.batch.read_namespaced_job(job_name, namespace)
-        except Exception:
-            return None
+        except ApiException as exc:
+            if exc.status == 404:
+                return None
+
+            raise BackendError(str(exc), status_code=exc.status or 500) from exc
         return job_phase(job)
 
     def delete_job(self, job_name: str, namespace: str) -> None:
@@ -374,6 +377,9 @@ class K8sBackend(InfraBackend):
                     sub_path=cfg.pvc_sub_path or None,
                 )
             )
+            # /data is always a fixed top-level directory in the PVC for raw input
+            # data. It is intentionally not derived from pvc_sub_path, which only
+            # controls where Scipion project files live.
             mounts.append(
                 client.V1VolumeMount(
                     name='projects-vol',
@@ -413,7 +419,7 @@ class K8sBackend(InfraBackend):
             client.V1EnvVar(name='ONECLIENT_SPACE', value=cfg.oneclient_space),
             client.V1EnvVar(
                 name='ONECLIENT_ACCESS_TOKEN',
-                value_from=client.V1EnvVarSource(secret_key_ref=client.V1SecretKeySelector(name=cfg.oneclient_token_secret, key='token')),
+                value_from=client.V1EnvVarSource(secret_key_ref=client.V1SecretKeySelector(name=cfg.oneclient_token_secret, key='TOKEN')),
             ),
         ]
         mount_args: list[str] = (cfg.oneclient_extra or []) + [
@@ -457,9 +463,12 @@ class K8sBackend(InfraBackend):
 
         return ts.timestamp()
 
-    @staticmethod
-    def _delete_evicted_pods(namespace: str) -> int:
-        """Delete all pods in `Failed` phase with reason `Evicted`."""
+    # Reasons that indicate a pod has permanently failed and should be cleaned up.
+    _FAILED_POD_REASONS: frozenset[str] = frozenset({'Evicted', 'OOMKilled', 'Error', 'OutOfMemory'})
+
+    @classmethod
+    def _delete_evicted_pods(cls, namespace: str) -> int:
+        """Delete all pods that have permanently failed."""
 
         deleted: int = 0
         try:
@@ -467,14 +476,23 @@ class K8sBackend(InfraBackend):
 
             for pod in pods:
                 reason: str = getattr(pod.status, 'reason', None) or ''
-                if reason == 'Evicted':
+                if not reason:
+                    for cs in pod.status.container_statuses or []:
+                        terminated = getattr(cs.state, 'terminated', None) if cs.state else None
+
+                        if terminated and terminated.reason:
+                            reason = terminated.reason
+                            break
+
+                if reason in cls._FAILED_POD_REASONS:
                     try:
                         k8s.core.delete_namespaced_pod(pod.metadata.name, namespace)
                         deleted += 1
                     except Exception:
                         logger.debug(
-                            'Failed to delete evicted pod %s',
+                            'Failed to delete failed pod %s (reason=%s)',
                             pod.metadata.name,
+                            reason,
                         )
         except Exception:
             logger.debug('Failed to list failed pods in %s', namespace)

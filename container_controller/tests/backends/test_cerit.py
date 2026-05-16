@@ -225,7 +225,7 @@ def test_cerit_submit_structure_spec_properties() -> None:
 
 
 def test_cerit_submit_structure_pvc_volume_mounted() -> None:
-    """PVC volume is mounted with correct claim name and sub-path."""
+    """PVC volume is mounted with correct claim name and projects sub-path."""
 
     backend = _make_backend(storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='data')
     mock_batch.create_namespaced_job.return_value = None
@@ -240,9 +240,114 @@ def test_cerit_submit_structure_pvc_volume_mounted() -> None:
     )
 
     spec = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec
+
+    # One PVC volume (no onedata_enabled)
     assert len(spec.volumes) == 1
     assert spec.volumes[0].persistent_volume_claim.claim_name == 'my-pvc'
-    assert spec.containers[0].volume_mounts[0].sub_path == 'data'
+
+    # /projects mount uses the configured pvc_sub_path
+    project_mount = next(m for m in spec.containers[0].volume_mounts if m.mount_path == '/projects')
+
+    assert project_mount.sub_path == 'data'
+
+
+def test_cerit_submit_structure_data_mount_present() -> None:
+    """/data is mounted from the same PVC with sub_path 'data'."""
+
+    backend = _make_backend(storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='projects')
+    mock_batch.create_namespaced_job.return_value = None
+
+    backend.submit_job(
+        namespace='cerit-ns',
+        job_name='data-mount-job',
+        image='img:v1',
+        command=['echo'],
+        env={},
+        labels={'app': 'scipion-worker'},
+    )
+
+    spec = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec
+    mounts = spec.containers[0].volume_mounts
+    mount_paths = [m.mount_path for m in mounts]
+    assert '/data' in mount_paths, 'Worker pod must have /data mount for raw input data'
+
+    data_mount = next(m for m in mounts if m.mount_path == '/data')
+    assert data_mount.sub_path == 'data'
+    assert data_mount.name == 'projects-vol'
+
+
+def test_cerit_submit_onedata_datasets_vol_present() -> None:
+    """When onedata_enabled, datasets-vol emptyDir and /datasets mount are present."""
+
+    backend = _make_backend(
+        storage_mode='pvc',
+        projects_pvc='my-pvc',
+        pvc_sub_path='projects',
+        onedata_enabled=True,
+        oneclient_image='onedata/oneclient:latest',
+        oneclient_provider='provider.example.com',
+        oneclient_space='myspace',
+        oneclient_token_secret='od-token',
+        oneclient_extra=[],
+    )
+    mock_batch.create_namespaced_job.return_value = None
+
+    backend.submit_job(
+        namespace='cerit-ns',
+        job_name='onedata-job',
+        image='img:v1',
+        command=['echo'],
+        env={},
+        labels={'app': 'scipion-worker'},
+    )
+
+    spec = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec
+    vol_names = [v.name for v in spec.volumes]
+    assert 'datasets-vol' in vol_names, 'datasets-vol emptyDir must be present when onedata_enabled'
+
+    datasets_vol = next(v for v in spec.volumes if v.name == 'datasets-vol')
+    assert datasets_vol.empty_dir is not None
+
+    main_mounts = spec.containers[0].volume_mounts
+    datasets_mount = next((m for m in main_mounts if m.mount_path == '/datasets'), None)
+    assert datasets_mount is not None, 'Main container must have /datasets mount'
+
+
+def test_cerit_submit_onedata_sidecar_mounts_datasets_not_projects() -> None:
+    """Onedata sidecar container mounts /datasets (not /projects) with Bidirectional propagation."""
+
+    backend = _make_backend(
+        storage_mode='pvc',
+        projects_pvc='my-pvc',
+        pvc_sub_path='projects',
+        onedata_enabled=True,
+        oneclient_image='onedata/oneclient:latest',
+        oneclient_provider='provider.example.com',
+        oneclient_space='myspace',
+        oneclient_token_secret='od-token',
+        oneclient_extra=[],
+    )
+    mock_batch.create_namespaced_job.return_value = None
+
+    backend.submit_job(
+        namespace='cerit-ns',
+        job_name='sidecar-job',
+        image='img:v1',
+        command=['echo'],
+        env={},
+        labels={'app': 'scipion-worker'},
+    )
+
+    spec = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec
+    sidecar = next((c for c in spec.containers if c.name == 'oneclient'), None)
+    assert sidecar is not None, 'oneclient sidecar must be present'
+
+    sidecar_mount_paths = [m.mount_path for m in (sidecar.volume_mounts or [])]
+    assert '/datasets' in sidecar_mount_paths, 'Sidecar must mount /datasets'
+    assert '/projects' not in sidecar_mount_paths, 'Sidecar must NOT mount /projects (FUSE/PVC conflict)'
+
+    datasets_sidecar_mount = next(m for m in sidecar.volume_mounts if m.mount_path == '/datasets')
+    assert datasets_sidecar_mount.mount_propagation == 'Bidirectional'
 
 
 def test_cerit_lifecycle_read_phase_running() -> None:
@@ -264,10 +369,10 @@ def test_cerit_lifecycle_read_phase_done() -> None:
 
 
 def test_cerit_lifecycle_read_phase_not_found() -> None:
-    """API error returns None."""
+    """404 ApiException returns None (job does not exist)."""
 
     backend = _make_backend()
-    mock_batch.read_namespaced_job.side_effect = Exception('not found')
+    mock_batch.read_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
     assert backend.read_job_phase('j1', 'cerit-ns') is None
 
 

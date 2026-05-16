@@ -13,10 +13,11 @@ try:
     config.load_incluster_config()
     logger.debug('Loaded in-cluster Kubernetes config')
 except Exception:
-    logger.warning(
-        'In-cluster config unavailable, falling back to local kubeconfig.',
-    )
-    config.load_kube_config()
+    try:
+        config.load_kube_config()
+        logger.debug('Loaded local kubeconfig')
+    except Exception:
+        logger.warning('No Kubernetes configuration found; K8s API calls will fail at runtime.')
 
 core: client.CoreV1Api = client.CoreV1Api()
 """`CoreV1Api` - pods, events, nodes, logs, namespaces."""

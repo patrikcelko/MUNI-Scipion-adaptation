@@ -37,6 +37,10 @@ RUN pip3 install --no-cache-dir scipion-installer && \
 # Install CTFFind plugin
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-cistem --noBin
 
+# Patch _libNone.Image (avoids AttributeError in container)
+COPY patch_libnone.py /tmp/patch_libnone.py
+RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
+
 # Create project directories
 RUN mkdir -p /projects /data /datasets && \
     chmod 777 /projects /data /datasets

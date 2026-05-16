@@ -34,12 +34,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 router: APIRouter = APIRouter(tags=['jobs'])
 
-# Bounded set of recently submitted job IDs (max 10 000 entries).
-# Used by /status to return non-empty for known jobs, preventing
-# Scipion queue monitor from firing "JOB ID not found" before run.db
-# has been synced.
 _MAX_KNOWN_JOBS: int = 10_000
 _known_jobs: OrderedDict[str, None] = OrderedDict()
+
+# Allowed characters in user-supplied originalCmd, prevents command injection.
+_SAFE_CMD_RE: re.Pattern[str] = re.compile(r'^[A-Za-z0-9 /_.=:\,\-]+$')
 
 
 def get_known_jobs_count() -> int:
@@ -48,25 +47,6 @@ def get_known_jobs_count() -> int:
     return len(_known_jobs)
 
 
-# Scipion _libNone patch
-_LIBNONE_SCRIPT: str = (
-    'import pwem, os\n'
-    "f = os.path.join(pwem.__path__[0], 'emlib', '_libNone.py')\n"
-    "c = open(f, encoding='utf-8').read()\n"
-    "if 'def write' not in c:\n"
-    "    c += '\\n# --- K8s robustness: missing Image methods ---\\n'\n"
-    "    c += 'Image.write = lambda self, *a: None\\n'\n"
-    "    c += 'Image.convert2DataType = lambda self, *a: None\\n'\n"
-    "    c += 'Image.applyTransforMatScipion = lambda self, *a: None\\n'\n"
-    "    c += 'Image.getData = lambda self: None\\n'\n"
-    "    c += 'Image.setData = lambda self, d: None\\n'\n"
-    "    c += 'Image.readPreview = lambda self, *a: None\\n'\n"
-    "    open(f, 'w', encoding='utf-8').write(c)\n"
-)
-_LIBNONE_B64: str = base64.b64encode(_LIBNONE_SCRIPT.encode()).decode()
-_LIBNONE_PATCH: str = f'echo {_LIBNONE_B64} | base64 -d | python3 - 2>/dev/null; '
-
-# Relion readCoordinates patch (emtable compatibility)
 _RELION_PATCH_SCRIPT: str = (
     'import glob\n'
     'f = glob.glob(\n'
@@ -185,6 +165,9 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
     if not original:
         return JSONResponse({'error': 'missing originalCmd'}, status_code=400)
 
+    if not _SAFE_CMD_RE.match(original):
+        return JSONResponse({'error': 'originalCmd contains invalid characters'}, status_code=400)
+
     cmd0: str = original.split(maxsplit=1)[0]
     logger.debug('Received command: %s', original)
 
@@ -215,7 +198,7 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
 
     # Scipion environment setup
     command: str = original
-    scipion_env_setup: str = f'export SCIPION_HOME=/opt/scipion && export XMIPP_HOME=/opt/scipion/software/em/xmipp-devel && export LD_LIBRARY_PATH="/opt/scipion/software/em/xmipp-devel/dist/lib:${{LD_LIBRARY_PATH}}" && . /opt/scipion/.scipion3/bin/activate && {_LIBNONE_PATCH}true'
+    scipion_env_setup: str = 'export SCIPION_HOME=/opt/scipion && export XMIPP_HOME=/opt/scipion/software/em/xmipp-devel && export LD_LIBRARY_PATH="/opt/scipion/software/em/xmipp-devel/dist/lib:${LD_LIBRARY_PATH}" && . /opt/scipion/.scipion3/bin/activate'
 
     if original.startswith('python3 '):
         command = original.replace('python3', 'python -m scipion run python3', 1)
