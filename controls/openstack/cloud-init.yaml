@@ -1,0 +1,102 @@
+#cloud-config
+
+# Cloud-init for Scipion Kubernetes through Ubuntu 24.04 on e-INFRA OpenStack
+# ===========================================================================
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - snapd
+
+users:
+  - default
+  - name: scipion
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - %%SSH_PUBKEY%%
+
+write_files:
+  - path: /opt/scipion/setup.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+
+      set -euo pipefail
+
+      REPO_URL="https://github.com/patrikcelko/MUNI-Scipion-adaptation.git"
+      REPO_DIR="/opt/scipion/repo"
+
+      log() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*";
+      }
+
+      log "Starting Scipion Kubernetes setup - instance %%INSTANCE_ID%%."
+
+      # MicroK8s
+      log "Installing MicroK8s (%%K8S_CHANNEL%%)..."
+      snap install microk8s --classic --channel=%%K8S_CHANNEL%%
+      microk8s status --wait-ready
+
+      log "Enabling MicroK8s addons..."
+      microk8s enable dns storage helm3 ingress
+
+      log "Waiting for cluster to be ready..."
+      microk8s.kubectl wait --for=condition=ready nodes --all --timeout=300s
+      microk8s.kubectl -n kube-system wait --for=condition=available deploy \
+          --all --timeout=180s || true
+
+      # Docker
+      log "Installing Docker..."
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+
+      CODENAME="$(. /etc/os-release; echo "$VERSION_CODENAME")"
+      printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+          "$(dpkg --print-architecture)" "$CODENAME" \
+          > /etc/apt/sources.list.d/docker.list
+
+      apt-get update -q
+      apt-get install -y docker-ce docker-ce-cli containerd.io
+
+      # Group membership
+      usermod -aG docker   ubuntu  2>/dev/null || true
+      usermod -aG docker   scipion 2>/dev/null || true
+      usermod -aG microk8s ubuntu  2>/dev/null || true
+      usermod -aG microk8s scipion 2>/dev/null || true
+
+      # Convenience aliases
+      snap alias microk8s.kubectl kubectl
+      snap alias microk8s.helm3    helm
+
+      # Clone repository and deploy
+      log "Cloning repository..."
+      git clone "$REPO_URL" "$REPO_DIR"
+      cd "$REPO_DIR"
+
+      log "Running deploy-local.sh..."
+      export CLUSTER_TYPE=microk8s
+      export VNC_PASSWORD=%%VNC_PASSWORD%%
+      export NODE_PORT_GUI=%%VNC_NODEPORT%%
+      export NODE_PORT_CTRL=%%MONITOR_NODEPORT%%
+      bash controls/deploy-local.sh deploy
+
+      log "Deployment complete - instance %%INSTANCE_ID%%."
+      log "Access details:"
+      log "  noVNC: http://%%FLOATING_IP%%:%%VNC_NODEPORT%%"
+      log "  Monitor: http://%%FLOATING_IP%%:%%MONITOR_NODEPORT%%"
+      log "  VNC pass: %%VNC_PASSWORD%%"
+
+      microk8s.kubectl get pods --all-namespaces
+
+runcmd:
+  - bash /opt/scipion/setup.sh >> /var/log/scipion-setup.log 2>&1
