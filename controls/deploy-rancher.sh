@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Scipion deployment helper for CERIT
+# Scipion deployment helper for Rancher
 # ===================================
 
 set -euo pipefail
@@ -27,7 +27,7 @@ HELM_CHART="${HELM_CHART:-$REPO_DIR/helm}"
 # Helm values files
 VALUES_BASE="$HELM_CHART/values.yaml"
 VALUES_CTRL="$HELM_CHART/values-controller.yaml"
-VALUES_CERIT="${VALUES_CERIT:-$SCRIPT_DIR/cerit/values-cerit.yaml}"
+VALUES_RANCHER="${VALUES_RANCHER:-$SCRIPT_DIR/rancher/values-rancher.yaml}"
 
 # Image tags
 GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-v1.0.9}"
@@ -61,13 +61,13 @@ check_tools() {
 
     [[ -f "$VALUES_BASE"  ]] || err "Missing Helm values file: $VALUES_BASE"
     [[ -f "$VALUES_CTRL"  ]] || err "Missing Helm values file: $VALUES_CTRL"
-    [[ -f "$VALUES_CERIT" ]] || err "Missing Helm values file: $VALUES_CERIT"
+    [[ -f "$VALUES_RANCHER" ]] || err "Missing Helm values file: $VALUES_RANCHER"
 }
 
 # Print a summary box after a successful deployment.
 print_deploy_summary() {
     echo ''
-    info "Scipion deployment on CERIT-SC complete:"
+    info "Scipion deployment on Rancher cluster complete:"
     info "  Release: $RELEASE"
     info "  Namespace: $NAMESPACE"
 
@@ -94,9 +94,9 @@ do_deploy() {
         --namespace "$NAMESPACE"
         -f "$VALUES_BASE"
         -f "$VALUES_CTRL"
-        -f "$VALUES_CERIT"
+        -f "$VALUES_RANCHER"
         --set "vnc.password=${VNC_PASSWORD}"
-        --set "controller.backend=cerit"
+        --set "controller.backend=rancher"
         --set "image.tag=${GUI_IMAGE_TAG}"
         --set "controller.image.tag=${CTRL_IMAGE_TAG}"
         --wait --timeout 10m
@@ -152,11 +152,11 @@ do_status() {
 # Print a detailed help.
 do_help() {
     echo -e ""
-    echo -e "${BOLD}deploy-cerit.sh${NC} - Scipion deployment helper for CERIT-SC Kubernetes"
+    echo -e "${BOLD}deploy-rancher.sh${NC} - Scipion deployment helper for Rancher-SC Kubernetes"
     echo -e ""
     echo -e "${BOLD}USAGE${NC}"
     echo -e "  export KUBECONFIG=/path/to/cluster.yaml"
-    echo -e "  deploy-cerit.sh <command> [RELEASE] [NAMESPACE]"
+    echo -e "  deploy-rancher.sh <command> [RELEASE] [NAMESPACE]"
     echo -e ""
     echo -e "  ${CYAN}RELEASE${NC}      Helm release name (default: scipion)"
     echo -e "  ${CYAN}NAMESPACE${NC}    Kubernetes namespace (default: celko-ns)"
@@ -170,7 +170,7 @@ do_help() {
     echo -e "  ${GREEN}help${NC}      Show this help message."
     echo -e ""
     echo -e "${BOLD}ENVIRONMENT VARIABLES${NC}"
-    echo -e "  ${CYAN}KUBECONFIG${NC}        Path to CERIT Rancher kubeconfig"
+    echo -e "  ${CYAN}KUBECONFIG${NC}        Path to Rancher kubeconfig"
     echo -e "  ${CYAN}INGRESS_HOST${NC}      noVNC ingress hostname like scipion.celko-ns.dyn.cloud.e-infra.cz"
     echo -e "  ${CYAN}VNC_PASSWORD${NC}      VNC password (auto-generated if unset)"
     echo -e "  ${CYAN}GUI_IMAGE_TAG${NC}     GUI image tag to deploy"

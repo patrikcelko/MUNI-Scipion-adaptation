@@ -1,5 +1,5 @@
 """
-CERIT backend
+Rancher backend
 =============
 """
 
@@ -10,26 +10,26 @@ import pytest
 from kubernetes.client.exceptions import ApiException
 
 from controller.backends import _BACKENDS, BackendError, create_backend
-from controller.backends.cerit import (
-    _CERIT_DEFAULT_CPU_LIMIT,
-    _CERIT_DEFAULT_CPU_REQUEST,
-    _CERIT_DEFAULT_MEM_REQUEST_MB,
-    _CERIT_GPU_RESOURCE,
-    CeritBackend,
+from controller.backends.rancher import (
+    _RANCHER_DEFAULT_CPU_LIMIT,
+    _RANCHER_DEFAULT_CPU_REQUEST,
+    _RANCHER_DEFAULT_MEM_REQUEST_MB,
+    _RANCHER_GPU_RESOURCE,
+    RancherBackend,
 )
 from controller.utilities.config import Settings
 from tests.conftest import mock_batch, mock_core
 
 
 def _make_settings(**overrides: Any) -> Settings:
-    """Build a `Settings` instance with CERIT-SC defaults."""
+    """Build a `Settings` instance with Rancher defaults."""
 
     defaults: dict[str, Any] = {
-        'namespace': 'cerit-ns',
+        'namespace': 'rancher-ns',
         'jobs_ttl': 600,
         'jobs_cleanup_interval': 120,
         'storage_mode': 'pvc',
-        'projects_pvc': 'cerit-pvc',
+        'projects_pvc': 'rancher-pvc',
         'pvc_sub_path': 'projects',
         'toolmap_path': '/dev/null',
         'onedata_enabled': False,
@@ -38,20 +38,20 @@ def _make_settings(**overrides: Any) -> Settings:
     return Settings(**defaults)
 
 
-def _make_backend(**overrides: Any) -> CeritBackend:
-    """Create a `CeritBackend` wired to fake K8s clients."""
+def _make_backend(**overrides: Any) -> RancherBackend:
+    """Create a `RancherBackend` wired to fake K8s clients."""
 
-    return CeritBackend(_make_settings(**overrides))
+    return RancherBackend(_make_settings(**overrides))
 
 
-def test_cerit_submit_resources_cpu_requests_and_limits() -> None:
+def test_rancher_submit_resources_cpu_requests_and_limits() -> None:
     """CPU requests and limits are always set."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='test-job',
         image='harbor.celko.cz/scipion/xmipp:v3',
         command=['/bin/bash', '-c', 'echo hello'],
@@ -65,18 +65,18 @@ def test_cerit_submit_resources_cpu_requests_and_limits() -> None:
     container = job_obj.spec.template.spec.containers[0]
     resources = container.resources
 
-    assert resources.requests['cpu'] == _CERIT_DEFAULT_CPU_REQUEST
-    assert resources.limits['cpu'] == _CERIT_DEFAULT_CPU_LIMIT
+    assert resources.requests['cpu'] == _RANCHER_DEFAULT_CPU_REQUEST
+    assert resources.limits['cpu'] == _RANCHER_DEFAULT_CPU_LIMIT
 
 
-def test_cerit_submit_resources_memory_requests_and_limits() -> None:
+def test_rancher_submit_resources_memory_requests_and_limits() -> None:
     """Memory limit = requested mem_mb; request = max(mem_mb // 2, default)."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='mem-job',
         image='img:v1',
         command=['echo'],
@@ -90,18 +90,18 @@ def test_cerit_submit_resources_memory_requests_and_limits() -> None:
     resources = container.resources
 
     assert resources.limits['memory'] == '16384Mi'
-    expected_req = max(16384 // 2, _CERIT_DEFAULT_MEM_REQUEST_MB)
+    expected_req = max(16384 // 2, _RANCHER_DEFAULT_MEM_REQUEST_MB)
     assert resources.requests['memory'] == f'{expected_req}Mi'
 
 
-def test_cerit_submit_resources_small_memory_clamped_to_limit() -> None:
+def test_rancher_submit_resources_small_memory_clamped_to_limit() -> None:
     """When mem_mb < default request, request is clamped to mem_mb (not exceeding limit)."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='small-mem',
         image='img:v1',
         command=['echo'],
@@ -116,7 +116,7 @@ def test_cerit_submit_resources_small_memory_clamped_to_limit() -> None:
     assert container.resources.limits['memory'] == '1024Mi'
 
 
-def test_cerit_submit_resources_request_never_exceeds_limit() -> None:
+def test_rancher_submit_resources_request_never_exceeds_limit() -> None:
     """Memory requests must always be <= memory limits (K8s requirement)."""
 
     backend = _make_backend()
@@ -125,7 +125,7 @@ def test_cerit_submit_resources_request_never_exceeds_limit() -> None:
     for mem in (512, 1024, 2048, 4096, 8192, 16384):
         mock_batch.create_namespaced_job.reset_mock()
         backend.submit_job(
-            namespace='cerit-ns',
+            namespace='rancher-ns',
             job_name=f'mem-{mem}',
             image='img:v1',
             command=['echo'],
@@ -140,14 +140,14 @@ def test_cerit_submit_resources_request_never_exceeds_limit() -> None:
         assert req <= lim, f'mem_mb={mem}: request={req}Mi > limit={lim}Mi'
 
 
-def test_cerit_submit_resources_gpu_sets_nvidia_resource() -> None:
+def test_rancher_submit_resources_gpu_sets_nvidia_resource() -> None:
     """GPU flag adds nvidia.com/gpu resource requests and limits."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='gpu-job',
         image='img:v1',
         command=['echo'],
@@ -157,18 +157,18 @@ def test_cerit_submit_resources_gpu_sets_nvidia_resource() -> None:
     )
 
     container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
-    assert container.resources.limits[_CERIT_GPU_RESOURCE] == '1'
-    assert container.resources.requests[_CERIT_GPU_RESOURCE] == '1'
+    assert container.resources.limits[_RANCHER_GPU_RESOURCE] == '1'
+    assert container.resources.requests[_RANCHER_GPU_RESOURCE] == '1'
 
 
-def test_cerit_submit_resources_no_gpu_has_no_nvidia_resource() -> None:
+def test_rancher_submit_resources_no_gpu_has_no_nvidia_resource() -> None:
     """Without GPU flag, no nvidia resource is set."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='no-gpu',
         image='img:v1',
         command=['echo'],
@@ -178,18 +178,18 @@ def test_cerit_submit_resources_no_gpu_has_no_nvidia_resource() -> None:
     )
 
     container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
-    assert _CERIT_GPU_RESOURCE not in container.resources.limits
-    assert _CERIT_GPU_RESOURCE not in container.resources.requests
+    assert _RANCHER_GPU_RESOURCE not in container.resources.limits
+    assert _RANCHER_GPU_RESOURCE not in container.resources.requests
 
 
-def test_cerit_submit_structure_correct_metadata() -> None:
+def test_rancher_submit_structure_correct_metadata() -> None:
     """Job metadata matches the supplied name, namespace and labels."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='struct-job',
         image='img:v1',
         command=['/bin/bash', '-c', 'echo hi'],
@@ -199,18 +199,18 @@ def test_cerit_submit_structure_correct_metadata() -> None:
 
     job = mock_batch.create_namespaced_job.call_args[0][1]
     assert job.metadata.name == 'struct-job'
-    assert job.metadata.namespace == 'cerit-ns'
+    assert job.metadata.namespace == 'rancher-ns'
     assert job.metadata.labels == {'app': 'scipion-worker', 'tool': 'relion'}
 
 
-def test_cerit_submit_structure_spec_properties() -> None:
+def test_rancher_submit_structure_spec_properties() -> None:
     """Job spec has correct backoff, TTL and restart policy."""
 
     backend = _make_backend()
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='spec-job',
         image='img:v1',
         command=['echo'],
@@ -224,14 +224,14 @@ def test_cerit_submit_structure_spec_properties() -> None:
     assert job.spec.template.spec.restart_policy == 'Never'
 
 
-def test_cerit_submit_structure_pvc_volume_mounted() -> None:
+def test_rancher_submit_structure_pvc_volume_mounted() -> None:
     """PVC volume is mounted with correct claim name and projects sub-path."""
 
     backend = _make_backend(storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='data')
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='pvc-job',
         image='img:v1',
         command=['echo'],
@@ -251,14 +251,14 @@ def test_cerit_submit_structure_pvc_volume_mounted() -> None:
     assert project_mount.sub_path == 'data'
 
 
-def test_cerit_submit_structure_data_mount_present() -> None:
+def test_rancher_submit_structure_data_mount_present() -> None:
     """/data is mounted from the same PVC with sub_path 'data'."""
 
     backend = _make_backend(storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='projects')
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='data-mount-job',
         image='img:v1',
         command=['echo'],
@@ -276,7 +276,7 @@ def test_cerit_submit_structure_data_mount_present() -> None:
     assert data_mount.name == 'projects-vol'
 
 
-def test_cerit_submit_onedata_datasets_vol_present() -> None:
+def test_rancher_submit_onedata_datasets_vol_present() -> None:
     """When onedata_enabled, datasets-vol emptyDir and /datasets mount are present."""
 
     backend = _make_backend(
@@ -293,7 +293,7 @@ def test_cerit_submit_onedata_datasets_vol_present() -> None:
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='onedata-job',
         image='img:v1',
         command=['echo'],
@@ -313,7 +313,7 @@ def test_cerit_submit_onedata_datasets_vol_present() -> None:
     assert datasets_mount is not None, 'Main container must have /datasets mount'
 
 
-def test_cerit_submit_onedata_sidecar_mounts_datasets_not_projects() -> None:
+def test_rancher_submit_onedata_sidecar_mounts_datasets_not_projects() -> None:
     """Onedata sidecar container mounts /datasets (not /projects) with Bidirectional propagation."""
 
     backend = _make_backend(
@@ -330,7 +330,7 @@ def test_cerit_submit_onedata_sidecar_mounts_datasets_not_projects() -> None:
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
-        namespace='cerit-ns',
+        namespace='rancher-ns',
         job_name='sidecar-job',
         image='img:v1',
         command=['echo'],
@@ -350,89 +350,89 @@ def test_cerit_submit_onedata_sidecar_mounts_datasets_not_projects() -> None:
     assert datasets_sidecar_mount.mount_propagation == 'Bidirectional'
 
 
-def test_cerit_lifecycle_read_phase_running() -> None:
+def test_rancher_lifecycle_read_phase_running() -> None:
     """Active job is reported as RUNNING."""
 
     backend = _make_backend()
     mock_batch.read_namespaced_job.return_value = SimpleNamespace(status=SimpleNamespace(active=1, succeeded=0, failed=0))
 
-    assert backend.read_job_phase('j1', 'cerit-ns') == 'RUNNING'
+    assert backend.read_job_phase('j1', 'rancher-ns') == 'RUNNING'
 
 
-def test_cerit_lifecycle_read_phase_done() -> None:
+def test_rancher_lifecycle_read_phase_done() -> None:
     """Succeeded job is reported as DONE."""
 
     backend = _make_backend()
     mock_batch.read_namespaced_job.return_value = SimpleNamespace(status=SimpleNamespace(active=0, succeeded=1, failed=0))
 
-    assert backend.read_job_phase('j1', 'cerit-ns') == 'DONE'
+    assert backend.read_job_phase('j1', 'rancher-ns') == 'DONE'
 
 
-def test_cerit_lifecycle_read_phase_not_found() -> None:
+def test_rancher_lifecycle_read_phase_not_found() -> None:
     """404 ApiException returns None (job does not exist)."""
 
     backend = _make_backend()
     mock_batch.read_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
-    assert backend.read_job_phase('j1', 'cerit-ns') is None
+    assert backend.read_job_phase('j1', 'rancher-ns') is None
 
 
-def test_cerit_lifecycle_delete_job_success() -> None:
+def test_rancher_lifecycle_delete_job_success() -> None:
     """Successful deletion does not raise."""
 
     backend = _make_backend()
     mock_batch.delete_namespaced_job.return_value = None
-    backend.delete_job('j1', 'cerit-ns')
+    backend.delete_job('j1', 'rancher-ns')
 
 
-def test_cerit_lifecycle_delete_job_api_error() -> None:
+def test_rancher_lifecycle_delete_job_api_error() -> None:
     """ApiException is wrapped in BackendError with matching status code."""
 
     backend = _make_backend()
     mock_batch.delete_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
 
     with pytest.raises(BackendError) as exc_info:
-        backend.delete_job('j1', 'cerit-ns')
+        backend.delete_job('j1', 'rancher-ns')
     assert exc_info.value.status_code == 404
 
 
-def test_cerit_monitoring_list_pods_returns_empty() -> None:
+def test_rancher_monitoring_list_pods_returns_empty() -> None:
     """Empty pod list from API yields empty result."""
 
     backend = _make_backend()
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
-    assert backend.list_pods('cerit-ns') == []
+    assert backend.list_pods('rancher-ns') == []
 
 
-def test_cerit_monitoring_list_jobs_returns_empty() -> None:
+def test_rancher_monitoring_list_jobs_returns_empty() -> None:
     """Empty job list from API yields empty result."""
 
     backend = _make_backend()
     mock_batch.list_namespaced_job.return_value = SimpleNamespace(items=[])
 
-    assert backend.list_jobs('cerit-ns') == []
+    assert backend.list_jobs('rancher-ns') == []
 
 
-def test_cerit_monitoring_list_events_returns_empty() -> None:
+def test_rancher_monitoring_list_events_returns_empty() -> None:
     """Empty event list from API yields empty result."""
 
     backend = _make_backend()
     mock_core.list_namespaced_event.return_value = SimpleNamespace(items=[])
 
-    assert backend.list_events('cerit-ns') == []
+    assert backend.list_events('rancher-ns') == []
 
 
-def test_cerit_monitoring_read_pod_log() -> None:
+def test_rancher_monitoring_read_pod_log() -> None:
     """Pod log content is returned."""
 
     backend = _make_backend()
     mock_core.read_namespaced_pod_log.return_value = 'line1\nline2'
-    result = backend.read_pod_log('pod-1', 'cerit-ns', tail=50)
+    result = backend.read_pod_log('pod-1', 'rancher-ns', tail=50)
 
     assert 'line1' in result
 
 
-def test_cerit_admin_list_node_images() -> None:
+def test_rancher_admin_list_node_images() -> None:
     """Node images are collected with correct structure."""
 
     node = SimpleNamespace(
@@ -456,44 +456,44 @@ def test_cerit_admin_list_node_images() -> None:
     assert result[0]['count'] == 1
 
 
-def test_cerit_admin_delete_pod_success() -> None:
+def test_rancher_admin_delete_pod_success() -> None:
     """Successful pod deletion does not raise."""
 
     backend = _make_backend()
     mock_core.delete_namespaced_pod.return_value = None
-    backend.delete_pod('pod-1', 'cerit-ns')
+    backend.delete_pod('pod-1', 'rancher-ns')
 
 
-def test_cerit_admin_delete_pod_not_found() -> None:
+def test_rancher_admin_delete_pod_not_found() -> None:
     """ApiException on pod deletion is wrapped in BackendError."""
 
     backend = _make_backend()
     mock_core.delete_namespaced_pod.side_effect = ApiException(status=404, reason='Not Found')
 
     with pytest.raises(BackendError) as exc_info:
-        backend.delete_pod('pod-1', 'cerit-ns')
+        backend.delete_pod('pod-1', 'rancher-ns')
     assert exc_info.value.status_code == 404
 
 
-def test_cerit_cleanup_empty() -> None:
+def test_rancher_cleanup_empty() -> None:
     """Empty namespace yields zero deletions."""
 
     backend = _make_backend()
     mock_batch.list_namespaced_job.return_value = SimpleNamespace(items=[])
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
-    result = backend.cleanup_once(namespace='cerit-ns', jobs_ttl=300, max_finished_jobs=3)
+    result = backend.cleanup_once(namespace='rancher-ns', jobs_ttl=300, max_finished_jobs=3)
     assert result == {'deleted_ttl': 0, 'deleted_cap': 0, 'evicted': 0}
 
 
-def test_cerit_registration_registered() -> None:
-    """CeritBackend is registered under 'cerit'."""
+def test_rancher_registration_registered() -> None:
+    """RancherBackend is registered under 'rancher'."""
 
-    assert 'cerit' in _BACKENDS
+    assert 'rancher' in _BACKENDS
 
 
-def test_cerit_registration_create_backend() -> None:
-    """create_backend('cerit', ...) returns a CeritBackend instance."""
+def test_rancher_registration_create_backend() -> None:
+    """create_backend('rancher', ...) returns a RancherBackend instance."""
 
-    backend = create_backend('cerit', _make_settings())
-    assert isinstance(backend, CeritBackend)
+    backend = create_backend('rancher', _make_settings())
+    assert isinstance(backend, RancherBackend)

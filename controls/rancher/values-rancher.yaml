@@ -1,7 +1,7 @@
-# CERIT Scipion Helm chart
-# ========================
+# Rancher Scipion Helm chart
+# ==========================
 
-# CERIT Rancher enforces resource quotas, both requests and limits are mandatory.
+# Rancher enforces resource quotas, both requests and limits are mandatory.
 resources:
   requests:
     cpu: "2"
@@ -10,7 +10,7 @@ resources:
     cpu: "4"
     memory: "16Gi"
 
-# CERIT cluster uses the NFS CSI driver for shared storage.
+# Rancher cluster uses the NFS CSI driver for shared storage.
 persistence:
   enabled: true
   size: 50Gi
@@ -30,7 +30,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 
-# Override to match the NFS group owning the shared storage on CERIT.
+# Override to match the NFS group owning the shared storage.
 podSecurityContext:
   fsGroup: 1000
 
@@ -40,7 +40,7 @@ service:
 
 controller:
   enabled: true
-  backend: cerit  # Selects CeritBackend implementation
+  backend: rancher  # Selects RancherBackend implementation
 
   service:
     type: ClusterIP
