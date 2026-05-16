@@ -19,9 +19,12 @@ RUN pip3 install --no-cache-dir scipion-installer \
 # Stage 2: Runtime, only what the GUI needs
 FROM ubuntu:22.04
 
+ARG UID=1000
+ARG GID=1000
+
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 LC_ALL=C.UTF-8 \
-    USER=scipion UID=1000 HOME=/home/scipion \
+    USER=scipion UID=${UID} GID=${GID} HOME=/home/scipion \
     VNC_DISPLAY=1 VNC_GEOMETRY=1920x1080 VNC_DEPTH=24 \
     SCIPION_HOME=/opt/scipion
 
@@ -56,7 +59,8 @@ COPY --from=builder /opt/scipion /opt/scipion
 
 ENV PATH="/opt/TurboVNC/bin:/opt/VirtualGL/bin:${PATH}"
 
-RUN useradd -m -u ${UID} -s /bin/bash ${USER} \
+RUN groupadd -g ${GID} ${USER} \
+    && useradd -m -u ${UID} -g ${GID} -s /bin/bash ${USER} \
     && mkdir -p /opt/startup /data /projects ${SCIPION_HOME} \
     && chown -R ${USER}:${USER} /opt/startup /data /projects ${SCIPION_HOME} /home/${USER} \
     && install -d -m 700 -o ${UID} -g ${UID} /home/${USER}/.vnc
