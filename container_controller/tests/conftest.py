@@ -27,6 +27,7 @@ _env_patch = patch.dict(
         'PROJECTS_PVC': 'test-pvc',
         'PVC_SUB_PATH': 'projects',
         'TOOLMAP_PATH': '/dev/null',
+        'LOCAL_PATH': '/',
         'NODE_SELECTOR_JSON': '{}',
         'TOLERATIONS_JSON': '[]',
         'ONEDATA_ENABLED': 'false',
@@ -76,6 +77,7 @@ def settings() -> Settings:
         projects_pvc='test-pvc',
         pvc_sub_path='projects',
         toolmap_path='/dev/null',
+        local_path='/',
         onedata_enabled=False,
     )
 

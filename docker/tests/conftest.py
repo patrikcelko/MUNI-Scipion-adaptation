@@ -22,7 +22,8 @@ DOCKER_DIR: Path = REPO_ROOT / 'docker'
 SCRIPTS_DIR: Path = DOCKER_DIR / 'gui' / 'scripts'
 """Directory containing GUI startup scripts."""
 
-CONFIG_DIR: Path = DOCKER_DIR / 'config'
+CONFIG_DIR: Path = REPO_ROOT / 'docker' / 'config'
+TOOLS_YAML: Path = REPO_ROOT / 'helm' / 'config' / 'tools.yaml'
 """Directory containing configuration files."""
 
 

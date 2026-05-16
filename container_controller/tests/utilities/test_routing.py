@@ -3,6 +3,7 @@ Tool routing
 ============
 """
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -12,8 +13,6 @@ import yaml
 
 import controller.utilities.routing as routing_mod
 from controller.utilities.routing import (
-    GPU_PROTOCOLS,
-    PROTOCOL_MAPPINGS,
     choose_tool,
     choose_tool_by_protocol,
     detect_protocol_from_command,
@@ -185,25 +184,35 @@ def test_load_toolmap_caching_returns_same_data_without_reread(tmp_path: Any) ->
 
 
 TOOLS: list[dict[str, Any]] = [
-    {'image': 'harbor.io/xmipp:v1', 'match': '.*', 'enabled': True, 'needsGpu': False},
-    {'image': 'harbor.io/relion:v1', 'match': '.*', 'enabled': True, 'needsGpu': False},
+    {
+        'image': 'harbor.io/xmipp:v1',
+        'protocol': 'Xmipp',
+        'match': '.*',
+        'enabled': True,
+        'needsGpu': False,
+        'gpu_protocols': ['XmippProtMovieCorr'],
+    },
+    {'image': 'harbor.io/relion:v1', 'protocol': '.*Relion', 'match': '.*', 'enabled': True, 'needsGpu': False},
     {
         'image': 'harbor.io/ctffind4:v1',
+        'protocol': 'Cistem|.*CTFFind',
         'match': '.*',
         'enabled': True,
         'needsGpu': False,
     },
-    {'image': 'harbor.io/gctf:v1', 'match': '.*', 'enabled': True, 'needsGpu': True},
+    {'image': 'harbor.io/gctf:v1', 'protocol': '.*Gctf|ProtGctf', 'match': '.*', 'enabled': True, 'needsGpu': True},
     {
         'image': 'harbor.io/motioncor2:v1',
+        'protocol': '.*MotionCor',
         'match': '.*',
         'enabled': True,
         'needsGpu': True,
     },
-    {'image': 'harbor.io/eman2:v1', 'match': '.*', 'enabled': True, 'needsGpu': False},
+    {'image': 'harbor.io/eman2:v1', 'protocol': 'Eman', 'match': '.*', 'enabled': True, 'needsGpu': False},
     {
         'image': 'harbor.io/scipion3-remote:v1',
         'match': '.*',
+        'default': True,
         'enabled': True,
         'needsGpu': False,
     },
@@ -344,19 +353,6 @@ def test_choose_tool_disabled_tool_skipped() -> None:
         assert choose_tool('python3', '/dev/null') is None
 
 
-def test_constants_protocol_mappings_not_empty() -> None:
-    """PROTOCOL_MAPPINGS has at least 7 entries."""
-
-    assert len(PROTOCOL_MAPPINGS) >= 7
-
-
-def test_constants_gpu_protocols_has_known_entries() -> None:
-    """GPU_PROTOCOLS contains known GPU-requiring protocols."""
-
-    assert 'XmippProtMovieCorr' in GPU_PROTOCOLS
-    assert 'ProtGctf' in GPU_PROTOCOLS
-
-
 def test_choose_tool_copy_returns_dict_copy() -> None:
     """Mutating the return value must not affect subsequent calls."""
 
@@ -377,13 +373,6 @@ def test_choose_tool_copy_returns_dict_copy() -> None:
         assert 'MUTATED' not in result2
     finally:
         Path(path).unlink()
-
-
-def test_choose_tool_copy_regex_anchors_removed_from_protocol_mappings() -> None:
-    """Patterns should not have redundant ^ anchors (re.match already anchors)."""
-
-    for pattern, _substr in PROTOCOL_MAPPINGS:
-        assert not pattern.startswith('^'), f'Redundant ^ in pattern: {pattern}'
 
 
 def test_choose_tool_missing_match_tool_without_match_key_skipped() -> None:
@@ -407,3 +396,66 @@ def test_choose_tool_missing_match_all_tools_without_match_returns_none() -> Non
     tools = [{'image': 'no-match:v1', 'enabled': True}]
     with patch('controller.utilities.routing.load_toolmap', return_value=tools):
         assert choose_tool('python3', '/dev/null') is None
+
+
+def test_choose_by_protocol_disabled_tool_skipped() -> None:
+    """Disabled tool is skipped even when its protocol regex matches."""
+
+    tools = [
+        {'image': 'harbor.io/xmipp:v1', 'protocol': 'Xmipp', 'enabled': False, 'needsGpu': False},
+        {'image': 'harbor.io/scipion3-remote:v1', 'default': True, 'enabled': True, 'needsGpu': False},
+    ]
+    with patch('controller.utilities.routing.load_toolmap', return_value=tools):
+        result = choose_tool_by_protocol('XmippProtMovieGain', '/dev/null')
+
+    assert result is not None
+    assert 'scipion3-remote' in result['image']
+
+
+def test_choose_by_protocol_disabled_default_not_used() -> None:
+    """Disabled default entry is not returned as fallback, so result is None."""
+
+    tools = [
+        {'image': 'harbor.io/scipion3-remote:v1', 'default': True, 'enabled': False, 'needsGpu': False},
+    ]
+
+    with patch('controller.utilities.routing.load_toolmap', return_value=tools):
+        assert choose_tool_by_protocol('AnyProtocol', '/dev/null') is None
+
+
+def test_choose_by_protocol_case_insensitive() -> None:
+    """Protocol matching uses re.IGNORECASE, so lowercase input still routes correctly."""
+
+    tools = [
+        {'image': 'harbor.io/relion:v1', 'protocol': '.*Relion', 'enabled': True, 'needsGpu': False},
+        {'image': 'harbor.io/scipion3-remote:v1', 'default': True, 'enabled': True, 'needsGpu': False},
+    ]
+
+    with patch('controller.utilities.routing.load_toolmap', return_value=tools):
+        result = choose_tool_by_protocol('protrelionrefine3d', '/dev/null')
+
+    assert result is not None
+    assert 'relion' in result['image']
+
+
+def test_load_toolmap_cache_invalidated_on_mtime_change(tmp_path: Any) -> None:
+    """Cache is reloaded when the file modification time changes."""
+
+    routing_mod._toolmap_cache = None
+    routing_mod._toolmap_mtime = 0.0
+
+    f = tmp_path / 'tools.yaml'
+    f.write_text("- image: original:v1\n  match: '.*'\n")
+    r1 = load_toolmap(str(f))
+    assert r1[0]['image'] == 'original:v1'
+
+    # Overwrite content and advance mtime so the cache check detects a change.
+    f.write_text("- image: updated:v1\n  match: '.*'\n")
+    stat = f.stat()
+    os.utime(str(f), (stat.st_atime + 1, stat.st_mtime + 1))
+
+    r2 = load_toolmap(str(f))
+    assert r2[0]['image'] == 'updated:v1'
+
+    routing_mod._toolmap_cache = None
+    routing_mod._toolmap_mtime = 0.0

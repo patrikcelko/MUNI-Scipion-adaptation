@@ -68,63 +68,54 @@ def load_toolmap(toolmap_path: str) -> list[dict[str, Any]]:
     return [dict(t) for t in items]
 
 
-#  Protocol mapping tables
-PROTOCOL_MAPPINGS: list[tuple[str, str]] = [
-    (r'Xmipp', 'xmipp'),
-    (r'.*Relion', 'relion'),
-    (r'.*MotionCor', 'motioncor2'),
-    (r'.*Gctf|ProtGctf', 'gctf'),
-    (r'Cistem|.*CTFFind', 'ctffind4'),
-    (r'Eman', 'eman2'),
-    (r'Sphire|.*CRYOLO', 'scipion3-remote'),
-]
-
-GPU_PROTOCOLS: frozenset[str] = frozenset(
-    {
-        'XmippProtMovieCorr',
-        'ProtGctf',
-    }
-)
-
-
 def choose_tool_by_protocol(
     protocol_name: str,
     toolmap_path: str,
 ) -> dict[str, Any] | None:
-    """Map a Scipion protocol name to the best matching tool container."""
+    """Map a Scipion protocol name to the best matching tool container. The mapping is
+    driven entirely by the `protocol` regex fields in the toolmap YAML. Each tool entry
+    may additionally carry a `gpu_protocols` list to mark specific protocol class
+    names that require GPU even if the tool itself defaults to CPU.
+    """
 
     if not protocol_name:
         return None
 
     tools: list[dict[str, Any]] = load_toolmap(toolmap_path)
-
-    for pattern, tool_substr in PROTOCOL_MAPPINGS:
-        if re.match(pattern, protocol_name, re.IGNORECASE):
-            for tool in tools:
-                if not tool.get('enabled', True):
-                    continue
-
-                if tool_substr in tool.get('image', '').lower():
-                    result: dict[str, Any] = dict(tool)
-                    if protocol_name in GPU_PROTOCOLS:
-                        result['needsGpu'] = True
-                    logger.info(
-                        "Protocol '%s' -> %s%s",
-                        protocol_name,
-                        result.get('image'),
-                        ' (GPU override)' if result.get('needsGpu') else '',
-                    )
-
-                    return result
+    fallback: dict[str, Any] | None = None
 
     for tool in tools:
-        if 'scipion3-remote' in tool.get('image', '').lower():
+        if not tool.get('enabled', True):
+            continue
+
+        if tool.get('default', False):
+            if fallback is None:
+                fallback = tool
+            continue
+
+        pattern: str = tool.get('protocol', '')
+        if not pattern:
+            continue
+
+        if re.match(pattern, protocol_name, re.IGNORECASE):
+            result: dict[str, Any] = dict(tool)
+            if protocol_name in tool.get('gpu_protocols', []):
+                result['needsGpu'] = True
             logger.info(
-                "Protocol '%s' -> %s (default)",
+                "Protocol '%s' -> %s%s",
                 protocol_name,
-                tool.get('image'),
+                result.get('image'),
+                ' (GPU override)' if result.get('needsGpu') else '',
             )
-            return dict(tool)
+            return result
+
+    if fallback:
+        logger.info(
+            "Protocol '%s' -> %s (default)",
+            protocol_name,
+            fallback.get('image'),
+        )
+        return dict(fallback)
 
     return None
 

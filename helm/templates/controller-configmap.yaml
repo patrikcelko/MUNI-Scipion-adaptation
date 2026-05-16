@@ -1,7 +1,5 @@
 {{- $ctl := .Values.controller | default dict -}}
 {{- if and (kindIs "map" $ctl) ($ctl.enabled | default false) }}
-{{- $tools := ($ctl.tools | default (list)) -}}
-
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,5 +8,5 @@ metadata:
 {{ include "scipion3-remote.labels" . | indent 4 }}
 data:
   tools.yaml: |
-{{ toYaml $tools | indent 4 }}
+{{ .Files.Get "config/tools.yaml" | indent 4 }}
 {{- end }}

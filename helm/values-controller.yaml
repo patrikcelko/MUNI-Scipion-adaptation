@@ -30,29 +30,3 @@ controller:
 
   nodeSelectorJson: {}
   tolerationsJson: {}
-
-  tools:
-    - match: "^relion_.*"
-      image: harbor.celko.cz/scipion-adaptation/relion:v3
-      needsGpu: false
-      enabled: true
-    - match: "^xmipp_.*"
-      image: harbor.celko.cz/scipion-adaptation/xmipp:v3
-      needsGpu: false
-      enabled: true
-    - match: "^motioncor2(\\b|_)"
-      image: harbor.celko.cz/scipion-adaptation/motioncor2:v2
-      needsGpu: true
-      enabled: true
-    - match: "^ctffind4(\\b|_)"
-      image: harbor.celko.cz/scipion-adaptation/ctffind4:v4
-      needsGpu: false
-      enabled: true
-    - match: "^Gctf(\\b|_)"
-      image: harbor.celko.cz/scipion-adaptation/gctf:v2
-      needsGpu: true
-      enabled: true
-    - match: "^python3.*"
-      image: harbor.celko.cz/scipion-adaptation/scipion3-remote:v1.0.9
-      needsGpu: false
-      enabled: true

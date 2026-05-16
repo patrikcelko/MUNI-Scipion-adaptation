@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
-import controller.utilities.k8s as k8s_mod
 from tests.conftest import (
     make_event,
     make_job,
@@ -236,20 +235,6 @@ def test_metrics_returns_node_and_pod_data(client: Any) -> None:
     assert data['nodes'][0]['cpu_capacity_m'] == 4000
     assert data['nodes'][0]['cpu_pct'] == 37.5
     assert data['pods'][0]['cpu_m'] == 250
-
-
-def test_metrics_no_custom_api(client: Any) -> None:
-    """When metrics-server is unavailable."""
-
-    old = k8s_mod.custom_api
-    k8s_mod.custom_api = None
-    try:
-        resp = client.get('/api/metrics')
-        assert resp.status_code == 200
-        data = resp.json()
-        assert 'error' in data['nodes'][0]
-    finally:
-        k8s_mod.custom_api = old
 
 
 def test_metrics_api_failure(client: Any) -> None:

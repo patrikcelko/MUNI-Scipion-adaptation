@@ -18,7 +18,7 @@ COPY container_controller/pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir /app
 
 # Tools config
-COPY docker/config/tools.yaml /config/tools.yaml
+COPY helm/config/tools.yaml /config/tools.yaml
 
 COPY container_controller/controller/ /app/controller/
 
