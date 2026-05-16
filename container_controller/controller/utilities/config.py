@@ -90,9 +90,7 @@ def _safe_int(env_var: str, default: int) -> int:
     try:
         return int(raw)
     except (ValueError, TypeError):
-        logger.warning(
-            'Invalid integer for %s=%r, using default %d', env_var, raw, default
-        )
+        logger.warning('Invalid integer for %s=%r, using default %d', env_var, raw, default)
         return default
 
 
@@ -141,9 +139,7 @@ def get_settings() -> Settings:
         oneclient_image=os.environ.get('ONECLIENT_IMAGE', 'onedata/oneclient:latest'),
         oneclient_provider=os.environ.get('ONECLIENT_PROVIDER', ''),
         oneclient_space=os.environ.get('ONECLIENT_SPACE', ''),
-        oneclient_token_secret=os.environ.get(
-            'ONECLIENT_TOKEN_SECRET', 'onedata-credentials'
-        ),
+        oneclient_token_secret=os.environ.get('ONECLIENT_TOKEN_SECRET', 'onedata-credentials'),
         oneclient_extra=_safe_json('ONECLIENT_EXTRA', [], list),
         toolmap_path=os.environ.get('TOOLMAP_PATH', '/config/tools.yaml'),
         backend=os.environ.get('BACKEND', 'k8s'),

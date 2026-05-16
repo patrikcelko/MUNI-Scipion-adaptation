@@ -42,9 +42,7 @@ class K8sBackend(InfraBackend):
         cfg: Settings = self.settings
 
         volumes, mounts = self._build_volumes()
-        env_vars: list[client.V1EnvVar] = [
-            client.V1EnvVar(name=k, value=v) for k, v in env.items()
-        ]
+        env_vars: list[client.V1EnvVar] = [client.V1EnvVar(name=k, value=v) for k, v in env.items()]
 
         resource_limits: dict[str, str] = {'memory': f'{mem_mb}Mi', 'cpu': '2'}
         resource_requests: dict[str, str] = {
@@ -79,9 +77,7 @@ class K8sBackend(InfraBackend):
             containers=containers,
             volumes=volumes,
             node_selector=cfg.node_selector_json or None,
-            tolerations=[
-                client.V1Toleration(**t) for t in (cfg.tolerations_json or [])
-            ],
+            tolerations=[client.V1Toleration(**t) for t in (cfg.tolerations_json or [])],
         )
 
         if cfg.storage_mode == 'local' and prefer_node:
@@ -121,9 +117,7 @@ class K8sBackend(InfraBackend):
 
     def delete_job(self, job_name: str, namespace: str) -> None:
         try:
-            k8s.batch.delete_namespaced_job(
-                job_name, namespace, propagation_policy='Background'
-            )
+            k8s.batch.delete_namespaced_job(job_name, namespace, propagation_policy='Background')
         except ApiException as exc:
             raise BackendError(str(exc), status_code=exc.status or 500) from exc
 
@@ -155,9 +149,7 @@ class K8sBackend(InfraBackend):
                 if r:
                     res_info[c.name] = {
                         'req_cpu': (r.requests.get('cpu', '-') if r.requests else '-'),
-                        'req_mem': (
-                            r.requests.get('memory', '-') if r.requests else '-'
-                        ),
+                        'req_mem': (r.requests.get('memory', '-') if r.requests else '-'),
                         'lim_cpu': (r.limits.get('cpu', '-') if r.limits else '-'),
                         'lim_mem': (r.limits.get('memory', '-') if r.limits else '-'),
                     }
@@ -168,11 +160,7 @@ class K8sBackend(InfraBackend):
                     'phase': p.status.phase,
                     'age': age(p.metadata.creation_timestamp),
                     'node': p.spec.node_name or '-',
-                    'labels': {
-                        k: v
-                        for k, v in (p.metadata.labels or {}).items()
-                        if k in ('app', 'app.kubernetes.io/name', 'tool', 'job')
-                    },
+                    'labels': {k: v for k, v in (p.metadata.labels or {}).items() if k in ('app', 'app.kubernetes.io/name', 'tool', 'job')},
                     'containers': containers,
                     'resources': res_info,
                 }
@@ -204,12 +192,7 @@ class K8sBackend(InfraBackend):
     def list_events(self, namespace: str) -> list[dict[str, Any]]:
         events = k8s.core.list_namespaced_event(namespace).items
         events.sort(
-            key=lambda e: (
-                e.last_timestamp
-                or e.event_time
-                or e.metadata.creation_timestamp
-                or _EPOCH
-            ),
+            key=lambda e: e.last_timestamp or e.event_time or e.metadata.creation_timestamp or _EPOCH,
             reverse=True,
         )
 
@@ -233,20 +216,14 @@ class K8sBackend(InfraBackend):
         pod_metrics: list[dict[str, Any]] = []
 
         try:
-            nodes = k8s.custom_api.list_cluster_custom_object(
-                'metrics.k8s.io', 'v1beta1', 'nodes'
-            )
+            nodes = k8s.custom_api.list_cluster_custom_object('metrics.k8s.io', 'v1beta1', 'nodes')
             all_nodes = {nd.metadata.name: nd for nd in k8s.core.list_node().items}
             for n in nodes.get('items', []):
                 usage = n.get('usage', {})
                 cpu_m: float = parse_cpu(usage.get('cpu', '0'))
                 mem_mi: float = parse_mem(usage.get('memory', '0'))
                 node_obj = all_nodes.get(n['metadata']['name'])
-                cap = (
-                    (node_obj.status.capacity or {})
-                    if node_obj and node_obj.status
-                    else {}
-                )
+                cap = (node_obj.status.capacity or {}) if node_obj and node_obj.status else {}
                 cpu_cap: float = parse_cpu(cap.get('cpu', '0'))
                 mem_cap: float = parse_mem(cap.get('memory', '0'))
                 node_metrics.append(
@@ -264,9 +241,7 @@ class K8sBackend(InfraBackend):
             node_metrics = [{'error': str(exc)}]
 
         try:
-            pods = k8s.custom_api.list_namespaced_custom_object(
-                'metrics.k8s.io', 'v1beta1', namespace, 'pods'
-            )
+            pods = k8s.custom_api.list_namespaced_custom_object('metrics.k8s.io', 'v1beta1', namespace, 'pods')
             for p in pods.get('items', []):
                 total_cpu: float = 0
                 total_mem: float = 0
@@ -287,9 +262,7 @@ class K8sBackend(InfraBackend):
         return {'nodes': node_metrics, 'pods': pod_metrics}
 
     def read_pod_log(self, pod_name: str, namespace: str, *, tail: int = 100) -> str:
-        return k8s.core.read_namespaced_pod_log(
-            pod_name, namespace, tail_lines=tail, timestamps=True
-        )
+        return k8s.core.read_namespaced_pod_log(pod_name, namespace, tail_lines=tail, timestamps=True)
 
     def list_node_images(self) -> list[dict[str, Any]]:
         nodes = k8s.core.list_node().items
@@ -326,9 +299,7 @@ class K8sBackend(InfraBackend):
         jobs_ttl: int,
         max_finished_jobs: int,
     ) -> dict[str, int]:
-        jobs = k8s.batch.list_namespaced_job(
-            namespace, label_selector='app=scipion-worker'
-        ).items
+        jobs = k8s.batch.list_namespaced_job(namespace, label_selector='app=scipion-worker').items
         now: float = time.time()
         deleted_ttl: int = 0
         deleted_cap: int = 0
@@ -414,14 +385,10 @@ class K8sBackend(InfraBackend):
             volumes.append(
                 client.V1Volume(
                     name='projects-local',
-                    host_path=client.V1HostPathVolumeSource(
-                        path=cfg.local_path, type='DirectoryOrCreate'
-                    ),
+                    host_path=client.V1HostPathVolumeSource(path=cfg.local_path, type='DirectoryOrCreate'),
                 )
             )
-            mounts.append(
-                client.V1VolumeMount(name='projects-local', mount_path='/projects')
-            )
+            mounts.append(client.V1VolumeMount(name='projects-local', mount_path='/projects'))
 
         volumes.append(
             client.V1Volume(
@@ -433,9 +400,7 @@ class K8sBackend(InfraBackend):
 
         return volumes, mounts
 
-    def _build_onedata_sidecar(
-        self, main_container: client.V1Container
-    ) -> client.V1Container:
+    def _build_onedata_sidecar(self, main_container: client.V1Container) -> client.V1Container:
         """Build the OneData oneclient sidecar container spec."""
 
         cfg: Settings = self.settings
@@ -447,11 +412,7 @@ class K8sBackend(InfraBackend):
             client.V1EnvVar(name='ONECLIENT_SPACE', value=cfg.oneclient_space),
             client.V1EnvVar(
                 name='ONECLIENT_ACCESS_TOKEN',
-                value_from=client.V1EnvVarSource(
-                    secret_key_ref=client.V1SecretKeySelector(
-                        name=cfg.oneclient_token_secret, key='token'
-                    )
-                ),
+                value_from=client.V1EnvVarSource(secret_key_ref=client.V1SecretKeySelector(name=cfg.oneclient_token_secret, key='token')),
             ),
         ]
         mount_args: list[str] = (cfg.oneclient_extra or []) + [
@@ -472,13 +433,7 @@ class K8sBackend(InfraBackend):
                     mount_propagation='Bidirectional',
                 )
             ],
-            lifecycle=client.V1Lifecycle(
-                pre_stop=client.V1LifecycleHandler(
-                    _exec=client.V1ExecAction(
-                        command=['fusermount', '-uz', '/datasets']
-                    )
-                )
-            ),
+            lifecycle=client.V1Lifecycle(pre_stop=client.V1LifecycleHandler(_exec=client.V1ExecAction(command=['fusermount', '-uz', '/datasets']))),
         )
 
         # Adjust main container mount propagation for shared FUSE mount.
@@ -495,9 +450,7 @@ class K8sBackend(InfraBackend):
         if job.status is None:
             return 0.0
 
-        ts = getattr(job.status, 'completion_time', None) or getattr(
-            job.status, 'start_time', None
-        )
+        ts = getattr(job.status, 'completion_time', None) or getattr(job.status, 'start_time', None)
         if ts is None:
             return 0.0
 
@@ -509,9 +462,7 @@ class K8sBackend(InfraBackend):
 
         deleted: int = 0
         try:
-            pods = k8s.core.list_namespaced_pod(
-                namespace, field_selector='status.phase=Failed'
-            ).items
+            pods = k8s.core.list_namespaced_pod(namespace, field_selector='status.phase=Failed').items
 
             for pod in pods:
                 reason: str = getattr(pod.status, 'reason', None) or ''

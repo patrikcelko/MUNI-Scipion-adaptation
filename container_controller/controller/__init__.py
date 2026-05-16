@@ -9,14 +9,11 @@ special tool container images.
 """
 
 __version__: str = '11.0.0'
-__all__: list[str] = [
-    '__version__',
-    'create_app'
-]
+__all__: list[str] = ['__version__', 'create_app']
 
 import logging
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -30,7 +27,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Start the background cleanup thread on application startup."""
 
     settings: Settings = app.state.settings  # type: ignore
@@ -72,9 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(
         title='Scipion Container Controller',
         version=__version__,
-        description=(
-            'Scipion Kubernetes job controller, translates qsub/qstat/qdel into Kubernetes Jobs.'
-        ),
+        description=('Scipion Kubernetes job controller, translates qsub/qstat/qdel into Kubernetes Jobs.'),
         lifespan=_lifespan,
     )
 

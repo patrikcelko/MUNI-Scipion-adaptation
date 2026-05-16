@@ -23,9 +23,7 @@ from controller.utilities import (
 def _make_job(succeeded: int = 0, failed: int = 0, active: int = 0) -> SimpleNamespace:
     """Build a minimal Job-like object with the given status counters."""
 
-    return SimpleNamespace(
-        status=SimpleNamespace(succeeded=succeeded, failed=failed, active=active)
-    )
+    return SimpleNamespace(status=SimpleNamespace(succeeded=succeeded, failed=failed, active=active))
 
 
 def test_load_yaml_loads_list_yaml(tmp_path: Any) -> None:

@@ -54,9 +54,7 @@ class DispatcherBackend(InfraBackend):
         """Send an HTTP request to the Dispatcher and return parsed JSON."""
 
         url: str = f'{self._base_url}{path}'
-        data: bytes | None = (
-            json.dumps(body).encode('utf-8') if body is not None else None
-        )
+        data: bytes | None = json.dumps(body).encode('utf-8') if body is not None else None
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header('Content-Type', 'application/json')
         req.add_header('User-Agent', 'Scipion-Controller/1.0')
@@ -88,9 +86,7 @@ class DispatcherBackend(InfraBackend):
             ) from exc
         except urllib.error.URLError as exc:
             msg = f'Dispatcher unreachable: {exc.reason}'
-            raise BackendError(
-                msg, status_code=502
-            ) from exc
+            raise BackendError(msg, status_code=502) from exc
 
     def submit_job(
         self,
@@ -167,11 +163,7 @@ class DispatcherBackend(InfraBackend):
         }
 
         # Determine endpoint, use authenticated or anonymous based on token.
-        endpoint: str = (
-            '/requests/metadata_rocrate/'
-            if self._token
-            else '/anon_requests/metadata_rocrate/'
-        )
+        endpoint: str = '/requests/metadata_rocrate/' if self._token else '/anon_requests/metadata_rocrate/'
 
         result: dict[str, Any] = self._request('POST', endpoint, body=rocrate_metadata)
 
@@ -197,9 +189,7 @@ class DispatcherBackend(InfraBackend):
         if not task_id:
             return None
 
-        endpoint: str = (
-            f'/requests/{task_id}' if self._token else f'/anon_requests/{task_id}'
-        )
+        endpoint: str = f'/requests/{task_id}' if self._token else f'/anon_requests/{task_id}'
 
         try:
             result: dict[str, Any] = self._request('GET', endpoint)

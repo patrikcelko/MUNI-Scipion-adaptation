@@ -269,9 +269,7 @@ def test_dispatcher_submit_includes_rocrate_metadata(
     assert '@graph' in body
 
     # Metadata descriptor is mandatory for ROCrate spec
-    descriptors = [
-        e for e in body['@graph'] if e.get('@id') == 'ro-crate-metadata.json'
-    ]
+    descriptors = [e for e in body['@graph'] if e.get('@id') == 'ro-crate-metadata.json']
     assert len(descriptors) == 1
 
     # Workflow uses @id reference to #scipion (not inline)

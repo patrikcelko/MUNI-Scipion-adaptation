@@ -114,9 +114,7 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
             status_code=400,
         )
 
-    project_name: str = re.sub(
-        r'[^A-Za-z0-9_-]', '_', data.get('project_name', 'DispatcherProject')
-    )[:64]
+    project_name: str = re.sub(r'[^A-Za-z0-9_-]', '_', data.get('project_name', 'DispatcherProject'))[:64]
 
     result = _fetch_workflow_json(workflow_url)
     if isinstance(result, JSONResponse):

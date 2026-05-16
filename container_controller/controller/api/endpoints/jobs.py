@@ -46,6 +46,7 @@ def get_known_jobs_count() -> int:
 
     return len(_known_jobs)
 
+
 # Scipion _libNone patch
 _LIBNONE_SCRIPT: str = (
     'import pwem, os\n'
@@ -98,9 +99,7 @@ _RELION_PATCH_SCRIPT: str = (
     "print('[PATCH] readCoordinates patched for emtable')\n"
 )
 _RELION_PATCH_B64: str = base64.b64encode(_RELION_PATCH_SCRIPT.encode()).decode()
-_RELION_PATCH_CMD: str = (
-    f'echo {_RELION_PATCH_B64} | base64 -d | python3 - 2>/dev/null && '
-)
+_RELION_PATCH_CMD: str = f'echo {_RELION_PATCH_B64} | base64 -d | python3 - 2>/dev/null && '
 
 
 def _get_settings(request: Request) -> Settings:
@@ -122,23 +121,14 @@ def _find_tool(
         logger.debug('Falling back to command-prefix routing: %s', cmd0)
         tool = choose_tool(cmd0, toolmap_path)
     if not tool:
-        avail = [
-            t.get('image')
-            for t in load_toolmap(toolmap_path)
-            if t.get('enabled', True)
-        ]
+        avail = [t.get('image') for t in load_toolmap(toolmap_path) if t.get('enabled', True)]
         logger.error(
             "No suitable container for protocol '%s'. Available: %s",
             protocol_name or 'unknown',
             avail,
         )
         return JSONResponse(
-            {
-                'error': (
-                    f'No container mapping found for protocol '
-                    f"'{protocol_name or 'unknown'}'"
-                )
-            },
+            {'error': (f"No container mapping found for protocol '{protocol_name or 'unknown'}'")},
             status_code=422,
         )
     return tool
@@ -163,26 +153,11 @@ def _build_cleanup_and_chown(
     logger.debug('Will clean stale outputs in %s', run_dir)
 
     run_db_path: str = f'{project_root}/{run_dir}/logs/run.db'
-    _script: str = (
-        'import sqlite3,sys\n'
-        'c=sqlite3.connect(sys.argv[1],timeout=10)\n'
-        'r=c.execute("UPDATE Objects SET value=0 '
-        "WHERE name LIKE '%._streamState' AND value=1\")\n"
-        'n=r.rowcount;c.commit();c.close()\n'
-        "print(f'[STREAM-FIX] Closed {n} open output streams') if n else None\n"
-    )
+    _script: str = "import sqlite3,sys\nc=sqlite3.connect(sys.argv[1],timeout=10)\nr=c.execute(\"UPDATE Objects SET value=0 WHERE name LIKE '%._streamState' AND value=1\")\nn=r.rowcount;c.commit();c.close()\nprint(f'[STREAM-FIX] Closed {n} open output streams') if n else None\n"
     _b64: str = base64.b64encode(_script.encode()).decode()
-    close_streams_cmd: str = (
-        f'echo {_b64} | base64 -d | python3 - "{run_db_path}" 2>/dev/null; '
-    )
+    close_streams_cmd: str = f'echo {_b64} | base64 -d | python3 - "{run_db_path}" 2>/dev/null; '
 
-    chown_cmd = (
-        f'; _ec=$?; '
-        f'{close_streams_cmd}'
-        f'chown -R 1000:1000 "{project_root}/{run_dir}" 2>/dev/null; '
-        f'chown 1000:1000 "{project_root}/project.sqlite" 2>/dev/null; '
-        f'exit $_ec'
-    )
+    chown_cmd = f'; _ec=$?; {close_streams_cmd}chown -R 1000:1000 "{project_root}/{run_dir}" 2>/dev/null; chown 1000:1000 "{project_root}/project.sqlite" 2>/dev/null; exit $_ec'
 
     return cleanup_cmd, chown_cmd
 
@@ -239,15 +214,7 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
 
     # Scipion environment setup
     command: str = original
-    scipion_env_setup: str = (
-        'export SCIPION_HOME=/opt/scipion && '
-        'export XMIPP_HOME=/opt/scipion/software/em/xmipp-devel && '
-        'export LD_LIBRARY_PATH="/opt/scipion/software/em/xmipp-devel/dist/lib:'
-        '${LD_LIBRARY_PATH}" && '
-        '. /opt/scipion/.scipion3/bin/activate && '
-        f'{_LIBNONE_PATCH}'
-        'true'
-    )
+    scipion_env_setup: str = f'export SCIPION_HOME=/opt/scipion && export XMIPP_HOME=/opt/scipion/software/em/xmipp-devel && export LD_LIBRARY_PATH="/opt/scipion/software/em/xmipp-devel/dist/lib:${{LD_LIBRARY_PATH}}" && . /opt/scipion/.scipion3/bin/activate && {_LIBNONE_PATCH}true'
 
     if original.startswith('python3 '):
         command = original.replace('python3', 'python -m scipion run python3', 1)
@@ -271,30 +238,16 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
             {'error': 'run directory contains invalid characters'},
             status_code=400,
         )
-    cleanup_cmd, chown_cmd = (
-        _build_cleanup_and_chown(project_root, run_dir) if run_dir else ('', '')
-    )
+    cleanup_cmd, chown_cmd = _build_cleanup_and_chown(project_root, run_dir) if run_dir else ('', '')
 
     try:
         mem_mb: int = max(512, min(65536, int(res.get('memoryMb', 4096))))
     except (ValueError, TypeError):
         mem_mb = 4096
 
-    full_shell_cmd: str = (
-        'mkdir -p /home/scipion/ScipionUserData && '
-        'ln -sfn /projects /home/scipion/ScipionUserData/projects && '
-        f'echo "localhost" > /tmp/pbs_nodefile && '
-        f'{cleanup_cmd}'
-        f'{tool_setup_cmd}'
-        f'{scipion_env_setup} && '
-        f'cd "{project_root}" && {command}'
-        f'{chown_cmd}'
-    )
+    full_shell_cmd: str = f'mkdir -p /home/scipion/ScipionUserData && ln -sfn /projects /home/scipion/ScipionUserData/projects && echo "localhost" > /tmp/pbs_nodefile && {cleanup_cmd}{tool_setup_cmd}{scipion_env_setup} && cd "{project_root}" && {command}{chown_cmd}'
 
-    tool_label: str = (
-        re.sub(r'[^A-Za-z0-9._-]', '_', (protocol_name or cmd0))[:63].strip('_.-')
-        or 'unknown'
-    )
+    tool_label: str = re.sub(r'[^A-Za-z0-9._-]', '_', (protocol_name or cmd0))[:63].strip('_.-') or 'unknown'
 
     backend = request.app.state.backend
     backend.submit_job(
@@ -352,9 +305,7 @@ async def cancel(job_id: str, request: Request) -> dict[str, bool] | JSONRespons
 
         return {'ok': True}
     except BackendError as exc:
-        return JSONResponse(
-            {'ok': False, 'error': str(exc)}, status_code=exc.status_code
-        )
+        return JSONResponse({'ok': False, 'error': str(exc)}, status_code=exc.status_code)
     except Exception as exc:
         return JSONResponse({'ok': False, 'error': str(exc)}, status_code=500)
 
@@ -368,12 +319,7 @@ def _build_tool_setup(protocol_name: str | None) -> str:
     cmd: str = ''
 
     if re.match(r'Xmipp', protocol_name):
-        cmd += (
-            'echo "[TOOL-SETUP] Setting up Xmipp binary paths..." && '
-            'ln -sfn /opt/scipion/software/em/xmipp-devel/dist/bin '
-            '/opt/scipion/software/em/xmipp-devel/bin 2>/dev/null && '
-            'echo "[TOOL-SETUP] Xmipp setup complete" && '
-        )
+        cmd += 'echo "[TOOL-SETUP] Setting up Xmipp binary paths..." && ln -sfn /opt/scipion/software/em/xmipp-devel/dist/bin /opt/scipion/software/em/xmipp-devel/bin 2>/dev/null && echo "[TOOL-SETUP] Xmipp setup complete" && '
 
     elif 'Relion' in protocol_name:
         cmd += (

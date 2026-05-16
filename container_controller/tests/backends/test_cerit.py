@@ -110,9 +110,7 @@ def test_cerit_submit_resources_small_memory_clamped_to_limit() -> None:
         mem_mb=1024,
     )
 
-    container = mock_batch.create_namespaced_job.call_args[0][
-        1
-    ].spec.template.spec.containers[0]
+    container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
 
     assert container.resources.requests['memory'] == '1024Mi'
     assert container.resources.limits['memory'] == '1024Mi'
@@ -135,9 +133,7 @@ def test_cerit_submit_resources_request_never_exceeds_limit() -> None:
             labels={'app': 'scipion-worker'},
             mem_mb=mem,
         )
-        c = mock_batch.create_namespaced_job.call_args[0][
-            1
-        ].spec.template.spec.containers[0]
+        c = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
         req = int(c.resources.requests['memory'].replace('Mi', ''))
         lim = int(c.resources.limits['memory'].replace('Mi', ''))
 
@@ -160,9 +156,7 @@ def test_cerit_submit_resources_gpu_sets_nvidia_resource() -> None:
         gpu=True,
     )
 
-    container = mock_batch.create_namespaced_job.call_args[0][
-        1
-    ].spec.template.spec.containers[0]
+    container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
     assert container.resources.limits[_CERIT_GPU_RESOURCE] == '1'
     assert container.resources.requests[_CERIT_GPU_RESOURCE] == '1'
 
@@ -183,9 +177,7 @@ def test_cerit_submit_resources_no_gpu_has_no_nvidia_resource() -> None:
         gpu=False,
     )
 
-    container = mock_batch.create_namespaced_job.call_args[0][
-        1
-    ].spec.template.spec.containers[0]
+    container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
     assert _CERIT_GPU_RESOURCE not in container.resources.limits
     assert _CERIT_GPU_RESOURCE not in container.resources.requests
 
@@ -235,9 +227,7 @@ def test_cerit_submit_structure_spec_properties() -> None:
 def test_cerit_submit_structure_pvc_volume_mounted() -> None:
     """PVC volume is mounted with correct claim name and sub-path."""
 
-    backend = _make_backend(
-        storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='data'
-    )
+    backend = _make_backend(storage_mode='pvc', projects_pvc='my-pvc', pvc_sub_path='data')
     mock_batch.create_namespaced_job.return_value = None
 
     backend.submit_job(
@@ -259,9 +249,7 @@ def test_cerit_lifecycle_read_phase_running() -> None:
     """Active job is reported as RUNNING."""
 
     backend = _make_backend()
-    mock_batch.read_namespaced_job.return_value = SimpleNamespace(
-        status=SimpleNamespace(active=1, succeeded=0, failed=0)
-    )
+    mock_batch.read_namespaced_job.return_value = SimpleNamespace(status=SimpleNamespace(active=1, succeeded=0, failed=0))
 
     assert backend.read_job_phase('j1', 'cerit-ns') == 'RUNNING'
 
@@ -270,9 +258,7 @@ def test_cerit_lifecycle_read_phase_done() -> None:
     """Succeeded job is reported as DONE."""
 
     backend = _make_backend()
-    mock_batch.read_namespaced_job.return_value = SimpleNamespace(
-        status=SimpleNamespace(active=0, succeeded=1, failed=0)
-    )
+    mock_batch.read_namespaced_job.return_value = SimpleNamespace(status=SimpleNamespace(active=0, succeeded=1, failed=0))
 
     assert backend.read_job_phase('j1', 'cerit-ns') == 'DONE'
 
@@ -297,9 +283,7 @@ def test_cerit_lifecycle_delete_job_api_error() -> None:
     """ApiException is wrapped in BackendError with matching status code."""
 
     backend = _make_backend()
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
 
     with pytest.raises(BackendError) as exc_info:
         backend.delete_job('j1', 'cerit-ns')
@@ -379,9 +363,7 @@ def test_cerit_admin_delete_pod_not_found() -> None:
     """ApiException on pod deletion is wrapped in BackendError."""
 
     backend = _make_backend()
-    mock_core.delete_namespaced_pod.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_core.delete_namespaced_pod.side_effect = ApiException(status=404, reason='Not Found')
 
     with pytest.raises(BackendError) as exc_info:
         backend.delete_pod('pod-1', 'cerit-ns')
@@ -395,9 +377,7 @@ def test_cerit_cleanup_empty() -> None:
     mock_batch.list_namespaced_job.return_value = SimpleNamespace(items=[])
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
-    result = backend.cleanup_once(
-        namespace='cerit-ns', jobs_ttl=300, max_finished_jobs=3
-    )
+    result = backend.cleanup_once(namespace='cerit-ns', jobs_ttl=300, max_finished_jobs=3)
     assert result == {'deleted_ttl': 0, 'deleted_cap': 0, 'evicted': 0}
 
 

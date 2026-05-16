@@ -36,9 +36,7 @@ def _make_backend() -> K8sBackend:
     return K8sBackend(_make_settings())
 
 
-def _make_finished_job(
-    name: str, *, age_s: float = 1000, succeeded: int = 1, failed: int = 0
-) -> SimpleNamespace:
+def _make_finished_job(name: str, *, age_s: float = 1000, succeeded: int = 1, failed: int = 0) -> SimpleNamespace:
     """Helper: create a finished job SimpleNamespace."""
 
     ts_val = time.time() - age_s
@@ -126,14 +124,10 @@ def test_cleanup_ttl_deletes_old_finished_jobs() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100)
     assert result['deleted_ttl'] == 1
 
-    mock_batch.delete_namespaced_job.assert_called_once_with(
-        'old-done', 'test-ns', propagation_policy='Background'
-    )
+    mock_batch.delete_namespaced_job.assert_called_once_with('old-done', 'test-ns', propagation_policy='Background')
 
 
 def test_cleanup_ttl_skips_jobs_without_timestamp() -> None:
@@ -153,9 +147,7 @@ def test_cleanup_ttl_skips_jobs_without_timestamp() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100)
 
     assert result['deleted_ttl'] == 0
 
@@ -169,9 +161,7 @@ def test_cleanup_ttl_deletes_failed_jobs() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=300, max_finished_jobs=100)
     assert result['deleted_ttl'] == 1
 
 
@@ -184,9 +174,7 @@ def test_cleanup_cap_deletes_oldest_beyond_cap() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=2
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=2)
 
     assert result['deleted_cap'] == 2
     assert result['deleted_ttl'] == 0
@@ -200,9 +188,7 @@ def test_cleanup_cap_no_deletion_when_under_cap() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=3
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=3)
 
     assert result['deleted_cap'] == 0
 
@@ -216,9 +202,7 @@ def test_cleanup_cap_zero_deletes_all_finished() -> None:
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=0
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=0)
 
     assert result['deleted_cap'] == 3
 
@@ -234,9 +218,7 @@ def test_delete_evicted_deletes_evicted_pods() -> None:
         metadata=SimpleNamespace(name='normal-pod'),
         status=SimpleNamespace(phase='Failed', reason='OOMKilled'),
     )
-    mock_core.list_namespaced_pod.return_value = SimpleNamespace(
-        items=[evicted, normal]
-    )
+    mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[evicted, normal])
     mock_core.delete_namespaced_pod.return_value = None
 
     count = K8sBackend._delete_evicted_pods('test-ns')
@@ -351,16 +333,12 @@ def test_cap_sort_no_timestamp_job_preserved_over_old_ones() -> None:
             start_time=None,
         ),
     )
-    mock_batch.list_namespaced_job.return_value = SimpleNamespace(
-        items=[old_job, no_ts_job]
-    )
+    mock_batch.list_namespaced_job.return_value = SimpleNamespace(items=[old_job, no_ts_job])
     mock_batch.delete_namespaced_job.return_value = None
     mock_core.list_namespaced_pod.return_value = SimpleNamespace(items=[])
 
     backend = _make_backend()
-    result = run_cleanup_once(
-        backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=1
-    )
+    result = run_cleanup_once(backend=backend, namespace='test-ns', jobs_ttl=9999, max_finished_jobs=1)
     # cap=1, 2 finished jobs -> 1 deleted;
     # old_job (with real ts) should be deleted, not no_ts_job
     assert result['deleted_cap'] == 1

@@ -134,9 +134,7 @@ def test_submit_no_matching_tool(client: Any) -> None:
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_with_gpu_resources(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_with_gpu_resources(client: Any, clear_known_jobs: Any) -> None:
     """Submit with GPU resources sets nvidia.com/gpu limit."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -156,9 +154,7 @@ def test_submit_with_gpu_resources(
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_records_known_job(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_records_known_job(client: Any, clear_known_jobs: Any) -> None:
     """Submit records job in _known_jobs."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -233,11 +229,7 @@ def test_submit_relion_setup(client: Any, clear_known_jobs: Any) -> None:
         },
     )
     assert resp.status_code == 200
-    cmd = (
-        mock_batch.create_namespaced_job.call_args[0][1]
-        .spec.template.spec.containers[0]
-        .command[2]
-    )
+    cmd = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0].command[2]
     assert 'RELION_HOME' in cmd
 
 
@@ -254,18 +246,12 @@ def test_submit_ctffind_setup(client: Any, clear_known_jobs: Any) -> None:
         },
     )
     assert resp.status_code == 200
-    cmd = (
-        mock_batch.create_namespaced_job.call_args[0][1]
-        .spec.template.spec.containers[0]
-        .command[2]
-    )
+    cmd = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0].command[2]
     assert 'ctffind' in cmd
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_cleanup_stale_outputs(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_cleanup_stale_outputs(client: Any, clear_known_jobs: Any) -> None:
     """Stale output cleanup commands are injected."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -277,11 +263,7 @@ def test_submit_cleanup_stale_outputs(
         },
     )
     assert resp.status_code == 200
-    cmd = (
-        mock_batch.create_namespaced_job.call_args[0][1]
-        .spec.template.spec.containers[0]
-        .command[2]
-    )
+    cmd = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0].command[2]
     assert 'CLEANUP' in cmd
     assert 'rm -f' in cmd
 
@@ -350,9 +332,7 @@ def test_submit_onedata_sidecar(client: Any) -> None:
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_backoff_limit_zero(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_backoff_limit_zero(client: Any, clear_known_jobs: Any) -> None:
     """Job spec has backoff_limit=0 (no retries)."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -440,9 +420,7 @@ def test_cancel_success(client: Any) -> None:
     resp = client.post('/cancel/12345')
     assert resp.status_code == 200
     assert resp.json()['ok'] is True
-    mock_batch.delete_namespaced_job.assert_called_with(
-        'scipion-job-12345', 'test-ns', propagation_policy='Background'
-    )
+    mock_batch.delete_namespaced_job.assert_called_with('scipion-job-12345', 'test-ns', propagation_policy='Background')
 
 
 def test_cancel_failure(client: Any) -> None:
@@ -462,9 +440,7 @@ def test_cancel_with_full_name(client: Any) -> None:
 
     resp = client.post('/cancel/scipion-job-99999')
     assert resp.status_code == 200
-    mock_batch.delete_namespaced_job.assert_called_with(
-        'scipion-job-99999', 'test-ns', propagation_policy='Background'
-    )
+    mock_batch.delete_namespaced_job.assert_called_with('scipion-job-99999', 'test-ns', propagation_policy='Background')
 
 
 def test_known_jobs_evicts_oldest_when_full(clear_known_jobs: Any) -> None:
@@ -493,9 +469,7 @@ def test_known_jobs_is_ordered_dict(clear_known_jobs: Any) -> None:
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=CTF_TOOLS))
-def test_ctffind_setup_preserves_base_setup(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_ctffind_setup_preserves_base_setup(client: Any, clear_known_jobs: Any) -> None:
     """CTFFind tool setup uses += to append, not = to overwrite."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -507,11 +481,7 @@ def test_ctffind_setup_preserves_base_setup(
         },
     )
     assert resp.status_code == 200
-    cmd = (
-        mock_batch.create_namespaced_job.call_args[0][1]
-        .spec.template.spec.containers[0]
-        .command[2]
-    )
+    cmd = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0].command[2]
     # Both CLEANUP (from base setup) and ctffind must be present.
     assert 'CLEANUP' in cmd
     assert 'ctffind' in cmd
@@ -590,9 +560,7 @@ def test_project_root_valid(client: Any, clear_known_jobs: Any) -> None:
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_namespace_hardening_instance_param_ignored(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_namespace_hardening_instance_param_ignored(client: Any, clear_known_jobs: Any) -> None:
     """Submitted jobs always use the configured namespace, ignoring 'instance'."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -650,9 +618,7 @@ def test_run_dir_validation_semicolon_rejected(client: Any) -> None:
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_run_dir_validation_normal_passes(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_run_dir_validation_normal_passes(client: Any, clear_known_jobs: Any) -> None:
     """Normal run_dir passes validation."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -666,9 +632,7 @@ def test_run_dir_validation_normal_passes(
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_zero_memory_clamped_to_512(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_zero_memory_clamped_to_512(client: Any, clear_known_jobs: Any) -> None:
     """Zero memoryMb is clamped to 512."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -680,16 +644,12 @@ def test_submit_zero_memory_clamped_to_512(
         },
     )
     assert resp.status_code == 200
-    container = mock_batch.create_namespaced_job.call_args[0][
-        1
-    ].spec.template.spec.containers[0]
+    container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
     assert container.resources.limits['memory'] == '512Mi'
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_huge_memory_clamped_to_65536(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_huge_memory_clamped_to_65536(client: Any, clear_known_jobs: Any) -> None:
     """Huge memoryMb is clamped to 65536."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -701,9 +661,7 @@ def test_submit_huge_memory_clamped_to_65536(
         },
     )
     assert resp.status_code == 200
-    container = mock_batch.create_namespaced_job.call_args[0][
-        1
-    ].spec.template.spec.containers[0]
+    container = mock_batch.create_namespaced_job.call_args[0][1].spec.template.spec.containers[0]
     assert container.resources.limits['memory'] == '65536Mi'
 
 
@@ -805,9 +763,7 @@ def test_submit_normal_protocol_unchanged() -> None:
 def test_cancel_404_forwarded(client: Any) -> None:
     """Cancel forwards K8s 404 status."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
     resp = client.post('/cancel/12345')
     assert resp.status_code == 404
     assert resp.json()['ok'] is False
@@ -816,9 +772,7 @@ def test_cancel_404_forwarded(client: Any) -> None:
 def test_cancel_409_forwarded(client: Any) -> None:
     """Cancel forwards K8s 409 status."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=409, reason='Conflict'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=409, reason='Conflict')
     resp = client.post('/cancel/12345')
     assert resp.status_code == 409
 
@@ -835,9 +789,7 @@ def test_cancel_generic_exception_returns_500(client: Any) -> None:
 def test_submit_libnone_script_has_encoding() -> None:
     """_LIBNONE_SCRIPT must use explicit encoding in open() calls."""
 
-    assert (
-        "encoding='utf-8'" in _LIBNONE_SCRIPT or 'encoding="utf-8"' in _LIBNONE_SCRIPT
-    )
+    assert "encoding='utf-8'" in _LIBNONE_SCRIPT or 'encoding="utf-8"' in _LIBNONE_SCRIPT
 
 
 def test_status_shell_injection(client: Any) -> None:
@@ -893,29 +845,20 @@ def test_cancel_too_long_rejected(client: Any) -> None:
 def test_submit_plain_text_body(client: Any) -> None:
     """POST /submit with non-JSON body returns 400."""
 
-    resp = client.post(
-        '/submit', content='not json', headers={'content-type': 'text/plain'}
-    )
+    resp = client.post('/submit', content='not json', headers={'content-type': 'text/plain'})
     assert resp.status_code == 400
-    assert (
-        'invalid' in resp.json()['error'].lower()
-        or 'json' in resp.json()['error'].lower()
-    )
+    assert 'invalid' in resp.json()['error'].lower() or 'json' in resp.json()['error'].lower()
 
 
 def test_submit_empty_body(client: Any) -> None:
     """POST /submit with empty body returns 400."""
 
-    resp = client.post(
-        '/submit', content='', headers={'content-type': 'application/json'}
-    )
+    resp = client.post('/submit', content='', headers={'content-type': 'application/json'})
     assert resp.status_code == 400
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_string_memory_uses_default(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_string_memory_uses_default(client: Any, clear_known_jobs: Any) -> None:
     """Non-numeric memoryMb uses default."""
 
     mock_batch.create_namespaced_job.return_value = None
@@ -930,9 +873,7 @@ def test_submit_string_memory_uses_default(
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
-def test_submit_null_memory_uses_default(
-    client: Any, clear_known_jobs: Any
-) -> None:
+def test_submit_null_memory_uses_default(client: Any, clear_known_jobs: Any) -> None:
     """Null memoryMb uses default."""
 
     mock_batch.create_namespaced_job.return_value = None

@@ -43,9 +43,7 @@ class CeritBackend(K8sBackend):
 
         volumes, mounts = self._build_volumes()
 
-        env_vars: list[client.V1EnvVar] = [
-            client.V1EnvVar(name=k, value=v) for k, v in env.items()
-        ]
+        env_vars: list[client.V1EnvVar] = [client.V1EnvVar(name=k, value=v) for k, v in env.items()]
 
         # CERIT-SC requires BOTH requests and limits on every container.
         # Memory request is half of limit but at least the default floor,
@@ -86,9 +84,7 @@ class CeritBackend(K8sBackend):
             containers=containers,
             volumes=volumes,
             node_selector=cfg.node_selector_json or None,
-            tolerations=[
-                client.V1Toleration(**t) for t in (cfg.tolerations_json or [])
-            ],
+            tolerations=[client.V1Toleration(**t) for t in (cfg.tolerations_json or [])],
         )
 
         if cfg.storage_mode == 'local' and prefer_node:
@@ -145,18 +141,14 @@ class CeritBackend(K8sBackend):
             volumes.append(
                 client.V1Volume(
                     name='projects',
-                    host_path=client.V1HostPathVolumeSource(
-                        path=cfg.local_path, type='DirectoryOrCreate'
-                    ),
+                    host_path=client.V1HostPathVolumeSource(path=cfg.local_path, type='DirectoryOrCreate'),
                 )
             )
             mounts.append(client.V1VolumeMount(name='projects', mount_path='/projects'))
 
         return volumes, mounts
 
-    def _build_onedata_sidecar(
-        self, main_container: client.V1Container
-    ) -> client.V1Container:
+    def _build_onedata_sidecar(self, main_container: client.V1Container) -> client.V1Container:
         cfg: Settings = self.settings
 
         return client.V1Container(
@@ -171,16 +163,11 @@ class CeritBackend(K8sBackend):
                 client.V1EnvVar(
                     name='ONECLIENT_ACCESS_TOKEN',
                     value_from=client.V1EnvVarSource(
-                        secret_key_ref=client.V1SecretKeySelector(
-                            name=cfg.oneclient_token_secret, key='token'
-                        ),
+                        secret_key_ref=client.V1SecretKeySelector(name=cfg.oneclient_token_secret, key='token'),
                     ),
                 ),
             ]
-            + [
-                client.V1EnvVar(name='ONECLIENT_EXTRA', value=a)
-                for a in cfg.oneclient_extra
-            ],
+            + [client.V1EnvVar(name='ONECLIENT_EXTRA', value=a) for a in cfg.oneclient_extra],
             volume_mounts=main_container.volume_mounts,
             resources=client.V1ResourceRequirements(
                 requests={'cpu': '100m', 'memory': '256Mi'},

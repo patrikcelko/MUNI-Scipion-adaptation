@@ -43,11 +43,13 @@ async def api_cleanup_status(request: Request) -> dict[str, Any]:
 
 
 @router.get('/disk', response_model=None)
-async def api_disk() -> dict[str, Any] | JSONResponse:
-    """Report disk usage of the root filesystem."""
+async def api_disk(request: Request) -> dict[str, Any] | JSONResponse:
+    """Report disk usage of the projects filesystem (PVC mount point)."""
 
+    cfg: Settings = request.app.state.settings
+    path = cfg.local_path or '/'
     try:
-        usage = shutil.disk_usage('/')
+        usage = shutil.disk_usage(path)
         total_gi: float = round(usage.total / (1024**3), 1)
         used_gi: float = round(usage.used / (1024**3), 1)
         free_gi: float = round(usage.free / (1024**3), 1)
@@ -76,9 +78,7 @@ async def api_images(request: Request) -> dict[str, Any] | JSONResponse:
 
 
 @router.delete('/job/{job_name}', response_model=None)
-async def api_kill_job(
-    job_name: str, request: Request
-) -> dict[str, str] | JSONResponse:
+async def api_kill_job(job_name: str, request: Request) -> dict[str, str] | JSONResponse:
     """Delete a specific job and its pods."""
 
     ns: str = get_namespace(request)
@@ -95,9 +95,7 @@ async def api_kill_job(
 
 
 @router.delete('/pod/{pod_name}', response_model=None)
-async def api_kill_pod(
-    pod_name: str, request: Request
-) -> dict[str, str] | JSONResponse:
+async def api_kill_pod(pod_name: str, request: Request) -> dict[str, str] | JSONResponse:
     """Delete a specific pod."""
 
     ns: str = get_namespace(request)

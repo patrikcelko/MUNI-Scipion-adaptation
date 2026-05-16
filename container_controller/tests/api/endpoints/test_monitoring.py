@@ -107,9 +107,7 @@ def test_pods_labels_filtered(client: Any) -> None:
 def test_jobs_list(client: Any) -> None:
     """List jobs returns correct data."""
 
-    mock_batch.list_namespaced_job.return_value = SimpleNamespace(
-        items=[make_job(active=1)]
-    )
+    mock_batch.list_namespaced_job.return_value = SimpleNamespace(items=[make_job(active=1)])
 
     resp = client.get('/api/jobs')
     assert resp.status_code == 200
@@ -333,10 +331,7 @@ def test_logs_default_tail(client: Any) -> None:
     mock_core.read_namespaced_pod_log.assert_called_once()
     # Verify default tail=100
     call_kwargs = mock_core.read_namespaced_pod_log.call_args
-    assert (
-        call_kwargs.kwargs.get('tail_lines') == 100
-        or call_kwargs[1].get('tail_lines') == 100
-    )
+    assert call_kwargs.kwargs.get('tail_lines') == 100 or call_kwargs[1].get('tail_lines') == 100
 
 
 def test_metrics_list_node_uses_list_not_read(client: Any) -> None:

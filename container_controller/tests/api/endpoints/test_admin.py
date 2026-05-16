@@ -153,9 +153,7 @@ def test_kill_job_invalid_name(client: Any) -> None:
 def test_kill_job_not_found(client: Any) -> None:
     """Missing job returns 404."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=404, reason='Not Found')
 
     resp = client.delete('/api/job/nonexistent-job')
     assert resp.status_code == 404
@@ -164,9 +162,7 @@ def test_kill_job_not_found(client: Any) -> None:
 def test_kill_job_server_error(client: Any) -> None:
     """K8s server error returns 500."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=500, reason='Internal Server Error'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=500, reason='Internal Server Error')
 
     resp = client.delete('/api/job/nonexistent-job')
     assert resp.status_code == 500
@@ -206,9 +202,7 @@ def test_kill_pod_invalid_name(client: Any) -> None:
 def test_kill_pod_not_found(client: Any) -> None:
     """Missing pod returns 404."""
 
-    mock_core.delete_namespaced_pod.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_core.delete_namespaced_pod.side_effect = ApiException(status=404, reason='Not Found')
 
     resp = client.delete('/api/pod/nonexistent-pod')
     assert resp.status_code == 404
@@ -217,9 +211,7 @@ def test_kill_pod_not_found(client: Any) -> None:
 def test_kill_pod_server_error(client: Any) -> None:
     """K8s server error returns 500."""
 
-    mock_core.delete_namespaced_pod.side_effect = ApiException(
-        status=500, reason='Internal Server Error'
-    )
+    mock_core.delete_namespaced_pod.side_effect = ApiException(status=500, reason='Internal Server Error')
 
     resp = client.delete('/api/pod/nonexistent-pod')
     assert resp.status_code == 500
@@ -338,9 +330,7 @@ def test_cleanup_thread_ref_stored_on_app_state(client: Any) -> None:
 def test_k8s_status_forwarding_delete_job_403(client: Any) -> None:
     """ApiException 403 is forwarded from job delete."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=403, reason='Forbidden'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=403, reason='Forbidden')
     resp = client.delete('/api/job/scipion-job-100')
     assert resp.status_code == 403
 
@@ -348,9 +338,7 @@ def test_k8s_status_forwarding_delete_job_403(client: Any) -> None:
 def test_k8s_status_forwarding_delete_pod_404(client: Any) -> None:
     """ApiException 404 is forwarded from pod delete."""
 
-    mock_core.delete_namespaced_pod.side_effect = ApiException(
-        status=404, reason='Not Found'
-    )
+    mock_core.delete_namespaced_pod.side_effect = ApiException(status=404, reason='Not Found')
     resp = client.delete('/api/pod/test-pod')
     assert resp.status_code == 404
 
@@ -358,8 +346,6 @@ def test_k8s_status_forwarding_delete_pod_404(client: Any) -> None:
 def test_k8s_status_forwarding_delete_job_409(client: Any) -> None:
     """ApiException 409 is forwarded from job delete."""
 
-    mock_batch.delete_namespaced_job.side_effect = ApiException(
-        status=409, reason='Conflict'
-    )
+    mock_batch.delete_namespaced_job.side_effect = ApiException(status=409, reason='Conflict')
     resp = client.delete('/api/job/scipion-job-100')
     assert resp.status_code == 409

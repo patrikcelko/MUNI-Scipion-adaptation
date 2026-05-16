@@ -36,9 +36,7 @@ def test_import_workflow_invalid_scheme(client: Any) -> None:
 
 
 @patch('urllib.request.urlopen')
-def test_import_workflow_successful(
-    mock_urlopen: Any, client: Any, tmp_path: Any
-) -> None:
+def test_import_workflow_successful(mock_urlopen: Any, client: Any, tmp_path: Any) -> None:
     """Successful workflow import returns 200 with project info."""
 
     workflow = [{'protocol': 'XmippProtMovieGain', 'params': {}}]
@@ -97,9 +95,7 @@ def test_import_workflow_project_name_sanitisation() -> None:
 
 
 @patch('urllib.request.urlopen')
-def test_import_workflow_default_project_name(
-    mock_urlopen: Any, client: Any, tmp_path: Any
-) -> None:
+def test_import_workflow_default_project_name(mock_urlopen: Any, client: Any, tmp_path: Any) -> None:
     """When project_name is omitted, falls back to 'DispatcherProject'."""
 
     workflow = [{'protocol': 'A'}]

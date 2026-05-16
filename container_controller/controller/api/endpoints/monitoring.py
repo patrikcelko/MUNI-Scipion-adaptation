@@ -78,11 +78,7 @@ async def api_pods(request: Request) -> dict[str, list[dict[str, Any]]]:
                 'phase': p.status.phase,
                 'age': age(p.metadata.creation_timestamp),
                 'node': p.spec.node_name or '-',
-                'labels': {
-                    k: v
-                    for k, v in (p.metadata.labels or {}).items()
-                    if k in ('app', 'app.kubernetes.io/name', 'tool', 'job')
-                },
+                'labels': {k: v for k, v in (p.metadata.labels or {}).items() if k in ('app', 'app.kubernetes.io/name', 'tool', 'job')},
                 'containers': containers,
                 'resources': res_info,
             }
@@ -124,9 +120,7 @@ async def api_events(request: Request) -> dict[str, list[dict[str, Any]]]:
     ns: str = get_namespace(request)
     events = k8s.core.list_namespaced_event(ns).items
     events.sort(
-        key=lambda e: (
-            e.last_timestamp or e.event_time or e.metadata.creation_timestamp or _EPOCH
-        ),
+        key=lambda e: e.last_timestamp or e.event_time or e.metadata.creation_timestamp or _EPOCH,
         reverse=True,
     )
 
@@ -158,9 +152,7 @@ async def api_metrics(
 
     # Node metrics
     try:
-        nodes = k8s.custom_api.list_cluster_custom_object(
-            'metrics.k8s.io', 'v1beta1', 'nodes'
-        )
+        nodes = k8s.custom_api.list_cluster_custom_object('metrics.k8s.io', 'v1beta1', 'nodes')
 
         all_nodes = {nd.metadata.name: nd for nd in k8s.core.list_node().items}
         for n in nodes.get('items', []):
@@ -168,9 +160,7 @@ async def api_metrics(
             cpu_m: float = parse_cpu(usage.get('cpu', '0'))
             mem_mi: float = parse_mem(usage.get('memory', '0'))
             node_obj = all_nodes.get(n['metadata']['name'])
-            cap = (
-                (node_obj.status.capacity or {}) if node_obj and node_obj.status else {}
-            )
+            cap = (node_obj.status.capacity or {}) if node_obj and node_obj.status else {}
             cpu_cap: float = parse_cpu(cap.get('cpu', '0'))
             mem_cap: float = parse_mem(cap.get('memory', '0'))
 
@@ -190,9 +180,7 @@ async def api_metrics(
 
     # Pod metrics
     try:
-        pods = k8s.custom_api.list_namespaced_custom_object(
-            'metrics.k8s.io', 'v1beta1', ns, 'pods'
-        )
+        pods = k8s.custom_api.list_namespaced_custom_object('metrics.k8s.io', 'v1beta1', ns, 'pods')
 
         for p in pods.get('items', []):
             total_cpu: float = 0
@@ -229,11 +217,7 @@ async def api_logs(
         return JSONResponse({'error': 'invalid pod name'}, status_code=400)
 
     try:
-        logs: str = k8s.core.read_namespaced_pod_log(
-            pod_name, ns, tail_lines=tail, timestamps=True
-        )
+        logs: str = k8s.core.read_namespaced_pod_log(pod_name, ns, tail_lines=tail, timestamps=True)
         return {'pod': pod_name, 'lines': logs.split('\n') if logs else []}
     except Exception as exc:
-        return JSONResponse(
-            {'pod': pod_name, 'error': str(exc), 'lines': []}, status_code=500
-        )
+        return JSONResponse({'pod': pod_name, 'error': str(exc), 'lines': []}, status_code=500)
