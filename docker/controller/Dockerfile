@@ -22,6 +22,7 @@ COPY docker/config/tools.yaml /config/tools.yaml
 
 COPY container_controller/controller/ /app/controller/
 
+RUN chown -R app:app /app
 USER app
 EXPOSE 5000
 
