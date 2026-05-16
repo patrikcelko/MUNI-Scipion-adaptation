@@ -45,6 +45,14 @@ def cleanup_finished_jobs(
 ) -> None:  # pragma: no cover - runs forever in a thread
     """Infinite loop: periodically clean up finished jobs and evicted pods."""
 
+    logger.info(
+        'Cleanup thread started (namespace=%s, interval=%ds, jobs_ttl=%ds, max_finished_jobs=%d)',
+        namespace,
+        interval,
+        jobs_ttl,
+        max_finished_jobs,
+    )
+
     while True:
         try:
             result = run_cleanup_once(

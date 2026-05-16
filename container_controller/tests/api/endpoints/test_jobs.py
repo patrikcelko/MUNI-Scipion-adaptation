@@ -187,7 +187,7 @@ def test_submit_pvc_volumes(client: Any, clear_known_jobs: Any) -> None:
     job = mock_batch.create_namespaced_job.call_args[0][1]
     vol_names = [v.name for v in job.spec.template.spec.volumes]
     assert 'projects-vol' in vol_names
-    assert 'datasets-vol' in vol_names
+    assert 'datasets-vol' not in vol_names  # onedata_enabled=False in test settings
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))
@@ -329,6 +329,8 @@ def test_submit_onedata_sidecar(client: Any) -> None:
         containers = job.spec.template.spec.containers
         assert len(containers) == 2
         assert containers[1].name == 'oneclient'
+        vol_names = [v.name for v in job.spec.template.spec.volumes]
+        assert 'datasets-vol' in vol_names  # emptyDir created when onedata_enabled=True
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=TOOLS))

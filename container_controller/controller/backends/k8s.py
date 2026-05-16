@@ -390,13 +390,14 @@ class K8sBackend(InfraBackend):
             )
             mounts.append(client.V1VolumeMount(name='projects-local', mount_path='/projects'))
 
-        volumes.append(
-            client.V1Volume(
-                name='datasets-vol',
-                empty_dir=client.V1EmptyDirVolumeSource(),
+        if cfg.onedata_enabled:
+            volumes.append(
+                client.V1Volume(
+                    name='datasets-vol',
+                    empty_dir=client.V1EmptyDirVolumeSource(),
+                )
             )
-        )
-        mounts.append(client.V1VolumeMount(name='datasets-vol', mount_path='/datasets'))
+            mounts.append(client.V1VolumeMount(name='datasets-vol', mount_path='/datasets'))
 
         return volumes, mounts
 

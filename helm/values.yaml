@@ -1,6 +1,6 @@
 onedata:
   enabled: false
-  image: onedata/oneclient:21.02.4
+  image: onedata/oneclient:latest
   provider: ""
   space: ""
   tokenSecret: ""

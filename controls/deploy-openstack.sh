@@ -39,6 +39,8 @@ KEYPAIR_NAME="${KEYPAIR_NAME:-scipion-key}"
 FLOATING_IP="${FLOATING_IP:-}"
 SSH_PUBKEY="${SSH_PUBKEY:-$HOME/.ssh/id_ed25519.pub}"
 K8S_CHANNEL="${K8S_CHANNEL:-1.30/stable}"
+GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-v1.0.9}"
+CTRL_IMAGE_TAG="${CTRL_IMAGE_TAG:-v11}"
 RENDERED_CLOUD_INIT=''
 
 # Port allocation, each instance gets unique NodePorts
@@ -85,6 +87,8 @@ render_cloud_init() {
     src="${src//%%K8S_CHANNEL%%/$K8S_CHANNEL}"
     src="${src//%%VNC_NODEPORT%%/$VNC_NODEPORT}"
     src="${src//%%MONITOR_NODEPORT%%/$MONITOR_NODEPORT}"
+    src="${src//%%GUI_IMAGE_TAG%%/$GUI_IMAGE_TAG}"
+    src="${src//%%CTRL_IMAGE_TAG%%/$CTRL_IMAGE_TAG}"
 
     printf '%s\n' "$src" > "$RENDERED_CLOUD_INIT"
 }
@@ -290,6 +294,8 @@ do_help() {
     echo -e "  ${CYAN}VNC_PASSWORD${NC}    VNC password (auto-generated if unset)"
     echo -e "  ${CYAN}SSH_PUBKEY${NC}      Path to SSH public key (default: ~/.ssh/id_ed25519.pub)"
     echo -e "  ${CYAN}K8S_CHANNEL${NC}     MicroK8s snap channel (default: 1.30/stable)"
+    echo -e "  ${CYAN}GUI_IMAGE_TAG${NC}   Scipion GUI image tag (default: v1.0.9)"
+    echo -e "  ${CYAN}CTRL_IMAGE_TAG${NC}  Scipion controller image tag (default: v11)"
     echo -e "  ${CYAN}CLOUD_INIT${NC}      Path to cloud-init file (default: controls/openstack/cloud-init.yaml)"
     echo -e ""
     echo -e "${BOLD}PORT ALLOCATION${NC}"
