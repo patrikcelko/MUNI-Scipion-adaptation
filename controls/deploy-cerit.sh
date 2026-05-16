@@ -5,9 +5,6 @@
 
 set -euo pipefail
 
-
-# Parse command-line arguments
-
 ACTION="${1:-deploy}"
 RELEASE="${2:-scipion}"
 NAMESPACE="${3:-${SCIPION_NAMESPACE:-celko-ns}}"
@@ -18,13 +15,11 @@ case "$ACTION" in
         ACTION=help
         ;;
     *)
-        echo "Unknown command: '$ACTION'. Use: deploy | teardown | purge | status | logs | help" >&2
-        exit 1
+        err "Unknown command: '$ACTION'. Use: deploy | teardown | purge | status | logs | help"
         ;;
 esac
 
 # Configuration
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 HELM_CHART="${HELM_CHART:-$REPO_DIR/helm}"
@@ -32,41 +27,26 @@ HELM_CHART="${HELM_CHART:-$REPO_DIR/helm}"
 # Helm values files
 VALUES_BASE="$HELM_CHART/values.yaml"
 VALUES_CTRL="$HELM_CHART/values-controller.yaml"
-VALUES_CERIT="$SCRIPT_DIR/values-cerit.yaml"
+VALUES_CERIT="${VALUES_CERIT:-$SCRIPT_DIR/cerit/values-cerit.yaml}"
 
-# Latest image tags
-GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-v2}"
-CTRL_IMAGE_TAG="${CTRL_IMAGE_TAG:-v51}"
+# Image tags
+GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-v1.0.9}"
+CTRL_IMAGE_TAG="${CTRL_IMAGE_TAG:-v11}"
 
 INGRESS_HOST="${INGRESS_HOST:-}"
 VNC_PASSWORD="${VNC_PASSWORD:-}"
+WORKER_LABEL="app=scipion-worker"
 
-# Logging helpers
+COMMON_DIR="$SCRIPT_DIR/common"
 
-RED='\033[0;31m';
-YELLOW='\033[1;33m';
-GREEN='\033[1;32m';
-CYAN='\033[0;36m';
-NC='\033[0m';
-BOLD='\033[1m';
+# shellcheck source=controls/common/logging.sh
+source "$COMMON_DIR/logging.sh"
 
+# shellcheck source=controls/common/utils.sh
+source "$COMMON_DIR/utils.sh"
 
-log()  {
-    echo -e "${GREEN}[CERIT]${NC} $*";
-}
-
-info() {
-    echo -e "${CYAN}[INFO ]${NC} $*";
-}
-
-warn() {
-    echo -e "${YELLOW}[WARN ]${NC} $*";
-}
-
-err()  {
-    echo -e "${RED}[ERROR]${NC} $*" >&2;
-    exit 1;
-}
+# shellcheck source=controls/common/onedata.sh
+source "$COMMON_DIR/onedata.sh"
 
 # Verify that required CLI tools and value files are present!
 check_tools() {
@@ -76,7 +56,7 @@ check_tools() {
     [[ -n "${KUBECONFIG:-}" || -f "$HOME/.kube/config" ]] \
         || err 'No KUBECONFIG set and ~/.kube/config is missing!'
 
-    kubectl version --request-timeout=10s >/dev/null 2>&1 \
+    kubectl cluster-info >/dev/null 2>&1 \
         || err 'Cannot reach Kubernetes API!'
 
     [[ -f "$VALUES_BASE"  ]] || err "Missing Helm values file: $VALUES_BASE"
@@ -84,57 +64,16 @@ check_tools() {
     [[ -f "$VALUES_CERIT" ]] || err "Missing Helm values file: $VALUES_CERIT"
 }
 
-# Create the target namespace if it does not already exist.
-ensure_namespace() {
-    if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
-        log "Creating namespace '$NAMESPACE'..."
-        kubectl create namespace "$NAMESPACE"
-    else
-        info "Namespace '$NAMESPACE' already exists, reusing..."
-    fi
-}
-
-# If ONEDATA_TOKEN is set, update Kubernetes secret that holds the OneData access token.
-provision_onedata_secret() {
-    if [[ -z "${ONEDATA_TOKEN:-}" ]]; then
-        return 0
-    fi
-
-    log 'OneData integration enabled, provisioning secret scipion-onedata-token...'
-    kubectl -n "$NAMESPACE" create secret generic scipion-onedata-token \
-        --from-literal=token="$ONEDATA_TOKEN" \
-        --dry-run=client -o yaml | kubectl apply -f -
-
-    echo "--set=onedata.enabled=true"
-    echo "--set=onedata.tokenSecret=scipion-onedata-token"
-    echo "--set=controller.onedata.enabled=true"
-    echo "--set=controller.onedata.tokenSecret=scipion-onedata-token"
-
-    [[ -n "${ONEDATA_PROVIDER:-}" ]] && {
-        echo "--set=onedata.provider=${ONEDATA_PROVIDER}"
-        echo "--set=controller.onedata.provider=${ONEDATA_PROVIDER}"
-    }
-    [[ -n "${ONEDATA_SPACE:-}" ]] && {
-        echo "--set=onedata.space=${ONEDATA_SPACE}"
-        echo "--set=controller.onedata.space=${ONEDATA_SPACE}"
-    }
-}
-
-# Generate a random 12-character alphanumeric password.
-random_password() {
-    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12
-}
-
 # Print a summary box after a successful deployment.
 print_deploy_summary() {
     echo ''
-    log "Scipion deployment on CERIT-SC complete:"
-    log "  Release: $RELEASE"
-    log "  Namespace: $NAMESPACE"
+    info "Scipion deployment on CERIT-SC complete:"
+    info "  Release: $RELEASE"
+    info "  Namespace: $NAMESPACE"
 
     [[ -n "$INGRESS_HOST" ]] \
-        && log "  noVNC URL : http://${INGRESS_HOST}/vnc.html"
-    log "  VNC pass  : $VNC_PASSWORD"
+        && info "  noVNC URL : http://${INGRESS_HOST}/vnc.html"
+    info "  VNC pass  : $VNC_PASSWORD"
 }
 
 # Do a Helm upgrade/install of the Scipion release.
@@ -144,7 +83,7 @@ do_deploy() {
 
     if [[ -z "$VNC_PASSWORD" ]]; then
         VNC_PASSWORD="$(random_password)"
-        log "No VNC_PASSWORD set, generated one: $VNC_PASSWORD"
+        info "No VNC_PASSWORD set, generated one: $VNC_PASSWORD"
     fi
 
     # Collect optional OneData flags
@@ -160,7 +99,6 @@ do_deploy() {
         --set "controller.backend=cerit"
         --set "image.tag=${GUI_IMAGE_TAG}"
         --set "controller.image.tag=${CTRL_IMAGE_TAG}"
-        --set "ingress.tls.enabled=false"
         --wait --timeout 10m
     )
 
@@ -169,7 +107,7 @@ do_deploy() {
     # Append any OneData overrides
     helm_args+=( "${onedata_args[@]+"${onedata_args[@]}"}" )
 
-    log "Deploying release '$RELEASE' into namespace '$NAMESPACE':"
+    info "Deploying release '$RELEASE' into namespace '$NAMESPACE':"
     info "  GUI image tag: ${GUI_IMAGE_TAG}"
     info "  Controller image tag: ${CTRL_IMAGE_TAG}"
 
@@ -178,67 +116,35 @@ do_deploy() {
     print_deploy_summary
 }
 
-# Uninstall the Helm release. PVCs are intentionally kept!
-do_teardown() {
-    check_tools
-
-    log "Uninstalling release '$RELEASE' from namespace '$NAMESPACE'..."
-    helm uninstall "$RELEASE" -n "$NAMESPACE" 2>/dev/null \
-        || warn "Release '$RELEASE' not found!"
-
-    # Remove orphaned Jobs/Pods created by the Scipion controller at runtime
-    kubectl delete jobs -n "$NAMESPACE" -l 'app=scipion-tool' --ignore-not-found
-    kubectl delete pods -n "$NAMESPACE" -l 'app=scipion-tool' \
-        --ignore-not-found --force --grace-period=0 2>/dev/null || true
-
-    log "Release removed successfully!"
-}
-
-# Uninstall the release AND delete all associated PVCs.
-do_purge() {
-    do_teardown
-
-    warn "Deleting all PVCs for release '$RELEASE' in namespace '$NAMESPACE'..."
-    warn "This is irreversible, so all Scipion project data will be lost!"
-    read -r -p "Type 'yes' to confirm: " confirm
-    [[ "$confirm" == "yes" ]] \
-        || { log "Aborted."; exit 0; }
-
-    kubectl delete pvc -n "$NAMESPACE" \
-        -l "app.kubernetes.io/instance=${RELEASE}" --ignore-not-found
-
-    log "PVCs deleted."
-}
-
 # Print a concise overview of the running deployment.
 do_status() {
     check_tools
 
-    log "Release: $RELEASE  |  Namespace: $NAMESPACE"
+    info "Release: $RELEASE  |  Namespace: $NAMESPACE"
     echo ''
 
-    info "--- Helm release ---"
+    info "Helm release:"
     helm status "$RELEASE" -n "$NAMESPACE" 2>/dev/null \
         || warn "Release '$RELEASE' not found in namespace '$NAMESPACE'"
 
     echo ''
-    info "--- Pods ---"
+    info "Pods:"
     kubectl get pods -n "$NAMESPACE" \
         -l "app.kubernetes.io/instance=${RELEASE}" \
         -o wide 2>/dev/null || true
 
     echo ''
-    info "--- Services ---"
+    info "Services:"
     kubectl get svc -n "$NAMESPACE" \
         -l "app.kubernetes.io/instance=${RELEASE}" 2>/dev/null || true
 
     echo ''
-    info "--- Ingress ---"
+    info "Ingress:"
     kubectl get ingress -n "$NAMESPACE" \
         -l "app.kubernetes.io/instance=${RELEASE}" 2>/dev/null || true
 
     echo ''
-    info "--- PVCs ---"
+    info "PVCs:"
     kubectl get pvc -n "$NAMESPACE" \
         -l "app.kubernetes.io/instance=${RELEASE}" 2>/dev/null || true
 }
@@ -279,22 +185,24 @@ do_help() {
     echo -e ""
 }
 
-# Stream live logs from the controller pod.
-do_logs() {
-    check_tools
-
-    log "Tailing controller logs for release '$RELEASE' in namespace '$NAMESPACE'..."
-    kubectl logs -n "$NAMESPACE" \
-        -l "app.kubernetes.io/name=scipion-controller,app.kubernetes.io/instance=${RELEASE}" \
-        --tail=200 -f
-}
-
 # Main entry point, dispatch based on the command
 case "$ACTION" in
-    deploy)   do_deploy   ;;
-    teardown) do_teardown ;;
-    purge)    do_purge    ;;
-    status)   do_status   ;;
-    logs)     do_logs     ;;
-    help)     do_help     ;;
+    deploy)
+        do_deploy
+        ;;
+    teardown)
+        do_teardown
+        ;;
+    purge)
+        do_purge
+        ;;
+    status)
+        do_status
+        ;;
+    logs)
+        do_logs
+        ;;
+    help)
+        do_help
+        ;;
 esac

@@ -8,7 +8,7 @@ onedata:
 
 image:
   repository: harbor.celko.cz/scipion-adaptation/scipion3-remote
-  tag: v3
+  tag: v1.0.9
   pullPolicy: IfNotPresent
 
 gpu:
@@ -21,6 +21,9 @@ resources:
   limits:
     cpu: "2"
     memory: "8Gi"
+
+seccompProfile:
+  type: RuntimeDefault
 
 vnc:
   display: 1

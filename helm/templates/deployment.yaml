@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
 {{ include "scipion3-remote.selectorLabels" . | indent 8 }}
+      {{- if .Values.vnc.password }}
+      annotations:
+        checksum/secret-vnc: {{ .Values.vnc.password | sha256sum }}
+      {{- end }}
     spec:
       {{- if .Values.gpu.runtimeClassName }}
       runtimeClassName: {{ .Values.gpu.runtimeClassName | quote }}
@@ -24,7 +28,7 @@ spec:
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
-          type: RuntimeDefault
+          type: {{ .Values.seccompProfile.type }}
       containers:
         - name: scipion
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -53,6 +53,6 @@ controller:
       needsGpu: true
       enabled: true
     - match: "^python3.*"
-      image: harbor.celko.cz/scipion-adaptation/scipion3-remote:v3
+      image: harbor.celko.cz/scipion-adaptation/scipion3-remote:v1.0.9
       needsGpu: false
       enabled: true
