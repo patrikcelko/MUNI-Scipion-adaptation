@@ -8,7 +8,7 @@ import json
 import time
 import urllib.error
 from io import BytesIO
-from typing import Any
+from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,7 +50,7 @@ class _FakeResponse:
     def read(self) -> bytes:
         return self._data
 
-    def __enter__(self) -> '_FakeResponse':
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:

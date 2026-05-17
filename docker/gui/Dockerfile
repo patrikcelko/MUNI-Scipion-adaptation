@@ -82,9 +82,9 @@ COPY docker/config/scipion.conf /opt/startup/scipion.conf
 COPY docker/config/hosts.conf /opt/startup/hosts.conf
 
 # Xmipp patches
-COPY docker/tools/xmipp/patches/patch_xmipp_init.py /opt/startup/patch_xmipp_init.py
-COPY docker/tools/xmipp/patches/xmippLib_stub.py /opt/startup/xmippLib_stub.py
-COPY docker/tools/xmipp/patches/wrap_xmipp_imports.py /opt/startup/wrap_xmipp_imports.py
+COPY docker/gui/patches/patch_xmipp_init.py /opt/startup/patch_xmipp_init.py
+COPY docker/gui/patches/xmippLib_stub.py /opt/startup/xmippLib_stub.py
+COPY docker/gui/patches/wrap_xmipp_imports.py /opt/startup/wrap_xmipp_imports.py
 COPY docker/tools/xmipp/patches/xmipp3_robustness.py /opt/startup/xmipp3_robustness.py
 
 # Example pipelines

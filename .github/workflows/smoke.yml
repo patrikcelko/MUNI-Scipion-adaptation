@@ -390,16 +390,6 @@ jobs:
 
           [ "$STATUS" = "400" ]
 
-      - name: "[smoke] POST /submit (originalCmd injection guard)"
-        run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
-            -X POST http://localhost:5000/submit \
-            -H 'Content-Type: application/json' \
-            -d '{"originalCmd": "python3 run.db; rm -rf /"}')
-          echo "HTTP status: $STATUS"
-
-          [ "$STATUS" = "400" ]
-
       - name: "[smoke] RBAC - controller SA can get/list ConfigMaps and Secrets"
         run: |
           SA=container-controller

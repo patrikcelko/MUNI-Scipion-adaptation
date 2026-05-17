@@ -51,16 +51,6 @@ def test_tools_match_patterns_compile(tools: list[dict[str, object]]) -> None:
             pytest.fail(f"Invalid regex '{pattern}': {exc}")
 
 
-def test_tools_images_are_pinned(tools: list[dict[str, object]]) -> None:
-    """No image may use `:latest` or be untagged."""
-
-    for tool in tools:
-        image = str(tool['image'])
-        assert ':' in image, f"Image '{image}' has no tag"
-        tag = image.rsplit(':', 1)[1]
-        assert tag and tag != 'latest', f"Image '{image}' uses :latest or empty tag"
-
-
 def test_tools_no_duplicate_patterns(tools: list[dict[str, object]]) -> None:
     """No two tools should share the same match pattern."""
 

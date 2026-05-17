@@ -5,7 +5,7 @@ K8s backend
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from kubernetes import client
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH: datetime = datetime(1970, 1, 1, tzinfo=UTC)
 """Fallback timestamp for events with all-None time fields."""
 
 

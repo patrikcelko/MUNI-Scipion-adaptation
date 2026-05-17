@@ -3,7 +3,7 @@ Monitoring endpoints
 ====================
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -161,7 +161,7 @@ def test_events_capped_at_50(client: Any) -> None:
             reason=f'Event{i}',
             involved_object=SimpleNamespace(name=f'pod-{i}'),
             message=f'msg {i}',
-            last_timestamp=datetime.now(timezone.utc) - timedelta(seconds=i),
+            last_timestamp=datetime.now(UTC) - timedelta(seconds=i),
             event_time=None,
             metadata=SimpleNamespace(creation_timestamp=None),
         )
