@@ -5,10 +5,10 @@
 resources:
   requests:
     cpu: "2"
-    memory: "8Gi"
+    memory: "4Gi"
   limits:
     cpu: "4"
-    memory: "16Gi"
+    memory: "8Gi"
 
 # Rancher cluster uses the NFS CSI driver for shared storage.
 persistence:

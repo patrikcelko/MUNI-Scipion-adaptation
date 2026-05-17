@@ -41,6 +41,15 @@ RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-cistem --noBin
 COPY patch_libnone.py /tmp/patch_libnone.py
 RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
 
+# Pre-create ctffind directories so job pods running as UID 1000 can populate them.
+# Also allow world-write on software/em so the job mkdir -p succeeds without root.
+RUN mkdir -p /opt/scipion/software/em/ctffind-${CTFFIND_VERSION}/bin && \
+    cp /usr/local/bin/ctffind /opt/scipion/software/em/ctffind-${CTFFIND_VERSION}/bin/ctffind && \
+    mkdir -p /opt/scipion/software/em/cistem-1.0.0-beta/bin && \
+    ln -sf /opt/scipion/software/em/ctffind-${CTFFIND_VERSION}/bin/ctffind \
+        /opt/scipion/software/em/cistem-1.0.0-beta/bin/ctffind && \
+    chmod -R a+rwx /opt/scipion/software/em
+
 # Create project directories
 RUN mkdir -p /projects /data /datasets && \
     chmod 777 /projects /data /datasets
