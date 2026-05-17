@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from monitor.api import ControllerClient
+from monitor.api.types import DeletedData, PodMetricData
 from monitor.ui.theme import (
     BG,
     BLUE,
@@ -77,7 +78,7 @@ class TaskMonitor(tk.Tk):
         self._tab_logs = tk.Frame(self._nb, bg=BG)
         self._nb.add(self._tab_logs, text=' Logs ')
 
-        self._pod_metrics: dict[str, dict] = {}
+        self._pod_metrics: dict[str, PodMetricData] = {}
         self._build_overview()
         self._build_logs_tab()
 
@@ -104,14 +105,13 @@ class TaskMonitor(tk.Tk):
             self._nb.select(self._tab_logs)
             self._fetch_logs()
 
-    def _show_result(self, result: dict | None, success_msg: str) -> None:
+    def _show_result(self, result: DeletedData | None, success_msg: str) -> None:
         """Update the cleanup label with a delete_job / delete_pod result."""
 
-        if result and 'deleted' in result:
+        if result:
             self._cleanup_lbl.config(text=success_msg, fg=GREEN)
         else:
-            err = result.get('error', 'unknown') if result else 'no response'
-            self._cleanup_lbl.config(text=f'Error: {err}', fg=RED)
+            self._cleanup_lbl.config(text='Error: no response', fg=RED)
 
     def _on_rightclick(
         self,
@@ -403,12 +403,8 @@ class TaskMonitor(tk.Tk):
             self._cleanup_lbl.config(text='Error: no response', fg=RED)
             return
 
-        if 'error' in result:
-            self._cleanup_lbl.config(text=f'Error: {result["error"]}', fg=RED)
-            return
-
-        n = result.get('deleted_ttl', 0) + result.get('deleted_cap', 0)
-        evicted = result.get('evicted', 0)
+        n = result['deleted_ttl'] + result['deleted_cap']
+        evicted = result['evicted']
         parts = [f'{n} job(s)']
 
         if evicted:
@@ -435,8 +431,8 @@ class TaskMonitor(tk.Tk):
             self._log_text.insert('end', 'Failed to fetch logs\n', 'error')
             return
 
-        lines = data.get('lines', [])
-        err = data.get('error')
+        lines = data['lines']
+        err = data['error']
 
         self._log_text.delete('1.0', 'end')
         if err:
@@ -497,9 +493,9 @@ class TaskMonitor(tk.Tk):
     def _format_resource(self, name: str) -> tuple[str, str]:
         """Return `(cpu_str, mem_str)` from cached pod metrics."""
 
-        pm = self._pod_metrics.get(name, {})
-        cpu_str = f'{pm["cpu_m"]}m' if pm.get('cpu_m') else '-'
-        mem_str = f'{pm["mem_mi"]}Mi' if pm.get('mem_mi') else '-'
+        pm = self._pod_metrics.get(name)
+        cpu_str = f'{pm["cpu_m"]}m' if pm and pm['cpu_m'] else '-'
+        mem_str = f'{pm["mem_mi"]}Mi' if pm and pm['mem_mi'] else '-'
 
         return cpu_str, mem_str
 
@@ -511,15 +507,15 @@ class TaskMonitor(tk.Tk):
         if not data:
             return
 
-        nodes = data.get('nodes', [])
-        if nodes and 'error' not in nodes[0]:
+        nodes = data['nodes']
+        if nodes and nodes[0]['error'] is None:
             n = nodes[0]
-            cpu_pct = n.get('cpu_pct', 0)
-            mem_pct = n.get('mem_pct', 0)
-            cpu_used = n.get('cpu_used_m', 0)
-            cpu_cap = n.get('cpu_capacity_m', 0)
-            mem_used = n.get('mem_used_mi', 0)
-            mem_cap = n.get('mem_capacity_mi', 0)
+            cpu_pct = n['cpu_pct'] or 0.0
+            mem_pct = n['mem_pct'] or 0.0
+            cpu_used = n['cpu_used_m'] or 0
+            cpu_cap = n['cpu_capacity_m'] or 0
+            mem_used = n['mem_used_mi'] or 0
+            mem_cap = n['mem_capacity_mi'] or 0
 
             self._cpu_lbl.config(text=f'{cpu_pct}%  ({cpu_used}m / {cpu_cap}m)')
             self._mem_lbl.config(text=f'{mem_pct}%  ({mem_used}Mi / {mem_cap}Mi)')
@@ -527,24 +523,23 @@ class TaskMonitor(tk.Tk):
             self.after_idle(lambda: draw_gauge(self._cpu_bar, cpu_pct, f'{cpu_pct}%'))
             self.after_idle(lambda: draw_gauge(self._mem_bar, mem_pct, f'{mem_pct}%'))
 
-        pods = data.get('pods', [])
         self._pod_metrics = {}
-
-        for p in pods:
-            self._pod_metrics[p.get('name', '')] = p
+        for p in data['pods']:
+            if p['name']:
+                self._pod_metrics[p['name']] = p
 
     def _update_disk(self) -> None:
         """Fetch disk usage and update the gauge and label."""
 
         data = self._client.get_disk()
 
-        if not data or 'error' in data:
+        if not data:
             return
 
-        pct = data.get('percent', 0)
-        used = data.get('used_gi', 0)
-        total = data.get('total_gi', 0)
-        free = data.get('free_gi', 0)
+        pct = data['percent']
+        used = data['used_gi']
+        total = data['total_gi']
+        free = data['free_gi']
 
         self._disk_lbl.config(text=f'{pct}%  ({used} / {total} GiB, {free} free)')
         self.after_idle(lambda: draw_gauge(self._disk_bar, pct, f'{pct}%'))
@@ -557,10 +552,10 @@ class TaskMonitor(tk.Tk):
         if not data:
             return
 
-        jobs = data.get('jobs', [])
-        running = sum(1 for j in jobs if j.get('phase') == 'RUNNING')
-        done = sum(1 for j in jobs if j.get('phase') == 'DONE')
-        failed = sum(1 for j in jobs if j.get('phase') == 'FAILED')
+        jobs = data['jobs']
+        running = sum(1 for j in jobs if j['phase'] == 'RUNNING')
+        done = sum(1 for j in jobs if j['phase'] == 'DONE')
+        failed = sum(1 for j in jobs if j['phase'] == 'FAILED')
 
         self._sum_labels['total'].config(text=str(len(jobs)))
         self._sum_labels['running'].config(text=str(running))
@@ -570,11 +565,11 @@ class TaskMonitor(tk.Tk):
         self._jobs_tree.delete(*self._jobs_tree.get_children())
 
         for j in jobs:
-            phase = j.get('phase', 'UNKNOWN')
+            phase = j['phase']
             tag = phase.lower()
-            name = j.get('name', '-')
-            tool = j.get('tool', '-')
-            age = j.get('age', '-')
+            name = j['name']
+            tool = j['tool']
+            age = j['age']
 
             cpu_str, mem_str = self._format_resource(name)
 
@@ -588,22 +583,21 @@ class TaskMonitor(tk.Tk):
         if not data:
             return
 
-        pods = data.get('pods', [])
+        pods = data['pods']
         all_pod_names: list[str] = []
 
         self._pods_tree.delete(*self._pods_tree.get_children())
         for p in pods:
-            restarts = sum(c.get('restarts', 0) for c in p.get('containers', []))
-            phase = p.get('phase', 'Unknown')
-            name = p.get('name', '-')
-            age = p.get('age', '-')
+            restarts = sum(c['restarts'] for c in p['containers'])
+            phase = p['phase']
+            name = p['name']
+            age = p['age']
             tag = 'running' if phase == 'Running' else ('succeeded' if phase == 'Succeeded' else 'pending')
 
             cpu_str, mem_str = self._format_resource(name)
 
             self._pods_tree.insert('', 'end', values=(name, phase, cpu_str, mem_str, str(restarts), age), tags=(tag,))
-            if name != '-':
-                all_pod_names.append(name)
+            all_pod_names.append(name)
 
         self._log_combo['values'] = all_pod_names
 
@@ -621,18 +615,18 @@ class TaskMonitor(tk.Tk):
         if not data:
             return
 
-        events = data.get('events', [])
+        events = data['events']
         self._events_tree.delete(*self._events_tree.get_children())
 
         for e in events[:_MAX_EVENTS]:
-            tag = 'normal' if e.get('type') == 'Normal' else 'warning'
+            tag = 'normal' if e['type'] == 'Normal' else 'warning'
             self._events_tree.insert(
                 '',
                 'end',
                 values=(
-                    e.get('reason', '-'),
-                    e.get('object', '-'),
-                    e.get('message', '-')[:120],
+                    e['reason'],
+                    e['object'],
+                    e['message'][:120],
                 ),
                 tags=(tag,),
             )

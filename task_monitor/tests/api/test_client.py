@@ -3,6 +3,8 @@ Test Client
 ===========
 """
 
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,7 +42,7 @@ def test_explicit_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @patch(_URLOPEN)
-def test_fetch_returns_parsed_json(mock_urlopen: MagicMock, mock_response) -> None:
+def test_fetch_returns_parsed_json(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """A successful fetch returns parsed JSON."""
 
     mock_urlopen.return_value = mock_response({'jobs': []})
@@ -72,7 +74,7 @@ def test_fetch_malformed_json_returns_none(mock_urlopen: MagicMock) -> None:
 
 
 @patch(_URLOPEN)
-def test_fetch_dict_filters_list_response(mock_urlopen: MagicMock, mock_response) -> None:
+def test_fetch_dict_filters_list_response(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """_fetch_dict returns None when the API responds with a JSON array."""
 
     mock_urlopen.return_value = mock_response([{'name': 'a'}])
@@ -80,7 +82,7 @@ def test_fetch_dict_filters_list_response(mock_urlopen: MagicMock, mock_response
 
 
 @patch(_URLOPEN)
-def test_fetch_dict_passes_dict_response(mock_urlopen: MagicMock, mock_response) -> None:
+def test_fetch_dict_passes_dict_response(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """_fetch_dict passes through dict responses."""
 
     mock_urlopen.return_value = mock_response({'jobs': []})
@@ -88,7 +90,7 @@ def test_fetch_dict_passes_dict_response(mock_urlopen: MagicMock, mock_response)
 
 
 @patch(_URLOPEN)
-def test_mutate_sends_correct_method(mock_urlopen: MagicMock, mock_response) -> None:
+def test_mutate_sends_correct_method(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """mutate() sets the HTTP method on the Request."""
 
     mock_urlopen.return_value = mock_response({'ok': True})
@@ -122,7 +124,7 @@ def test_mutate_error_returns_none(mock_urlopen: MagicMock) -> None:
 @patch(_URLOPEN)
 def test_get_endpoint_routing(
     mock_urlopen: MagicMock,
-    mock_response,
+    mock_response: Callable[..., MagicMock],
     method: str,
     endpoint: str,
 ) -> None:
@@ -136,7 +138,7 @@ def test_get_endpoint_routing(
 
 
 @patch(_URLOPEN)
-def test_get_logs_with_tail(mock_urlopen: MagicMock, mock_response) -> None:
+def test_get_logs_with_tail(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """get_logs sends pod name and tail parameter in the URL."""
 
     mock_urlopen.return_value = mock_response({'lines': ['line1']})
@@ -147,7 +149,7 @@ def test_get_logs_with_tail(mock_urlopen: MagicMock, mock_response) -> None:
 
 
 @patch(_URLOPEN)
-def test_get_logs_default_tail(mock_urlopen: MagicMock, mock_response) -> None:
+def test_get_logs_default_tail(mock_urlopen: MagicMock, mock_response: Callable[..., MagicMock]) -> None:
     """get_logs defaults to tail=50."""
 
     mock_urlopen.return_value = mock_response({'lines': []})
@@ -167,9 +169,9 @@ def test_get_logs_default_tail(mock_urlopen: MagicMock, mock_response) -> None:
 @patch(_URLOPEN)
 def test_mutate_convenience_methods(
     mock_urlopen: MagicMock,
-    mock_response,
+    mock_response: Callable[..., MagicMock],
     method: str,
-    args: tuple,
+    args: tuple[Any, ...],
     http_method: str,
     url_part: str,
 ) -> None:
@@ -197,9 +199,9 @@ def test_mutate_convenience_methods(
 @patch(_URLOPEN)
 def test_path_segments_are_url_encoded(
     mock_urlopen: MagicMock,
-    mock_response,
+    mock_response: Callable[..., MagicMock],
     method: str,
-    args: tuple,
+    args: tuple[Any, ...],
 ) -> None:
     """Special characters in resource names are percent-encoded."""
 
