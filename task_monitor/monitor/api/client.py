@@ -9,7 +9,8 @@ from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-DEFAULT_URL = 'http://scipion-controller:5000'
+DEFAULT_URL = 'http://localhost:30080'
+"""Default controller URL."""
 
 _TIMEOUT_GET = 5
 _TIMEOUT_MUTATE = 10

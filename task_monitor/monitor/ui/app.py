@@ -50,7 +50,16 @@ class TaskMonitor(tk.Tk):
         super().__init__()
         self.title('Scipion Task Monitor')
         self.configure(bg=BG)
-        self.geometry('640x900+1280+0')
+
+        # Centre on the primary monitor instead of hardcoding an x offset that
+        # puts the window off-screen on single-monitor setups.
+        self.geometry('640x900')
+        self.update_idletasks()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = max(0, (sw - 640) // 2)
+        y = max(0, (sh - 900) // 2)
+        self.geometry(f'640x900+{x}+{y}')
         self.minsize(500, 600)
 
         self._client = client or ControllerClient()
@@ -96,7 +105,7 @@ class TaskMonitor(tk.Tk):
             self._fetch_logs()
 
     def _show_result(self, result: dict | None, success_msg: str) -> None:
-        """Update the cleanup label with an action result."""
+        """Update the cleanup label with a delete_job / delete_pod result."""
 
         if result and 'deleted' in result:
             self._cleanup_lbl.config(text=success_msg, fg=GREEN)
@@ -394,8 +403,22 @@ class TaskMonitor(tk.Tk):
             return
 
         result = self._client.run_cleanup()
-        n = result.get('deleted') if result else None
-        self._show_result(result, f'Cleaned up {n} job(s)')
+        if result is None:
+            self._cleanup_lbl.config(text='Error: no response', fg=RED)
+            return
+
+        if 'error' in result:
+            self._cleanup_lbl.config(text=f'Error: {result["error"]}', fg=RED)
+            return
+
+        n = result.get('deleted_ttl', 0) + result.get('deleted_cap', 0)
+        evicted = result.get('evicted', 0)
+        parts = [f'{n} job(s)']
+
+        if evicted:
+            parts.append(f'{evicted} evicted pod(s)')
+
+        self._cleanup_lbl.config(text=f'Cleaned up {" + ".join(parts)}', fg=GREEN)
 
     def _fetch_logs(self) -> None:
         """Fetch logs for the selected pod and update the text widget."""
@@ -587,6 +610,12 @@ class TaskMonitor(tk.Tk):
                 all_pod_names.append(name)
 
         self._log_combo['values'] = all_pod_names
+
+        # If the currently selected pod has disappeared, clear the selection
+        # to prevent the next auto-refresh from querying a deleted pod.
+        current = self._log_pod_var.get()
+        if current and current not in all_pod_names:
+            self._log_pod_var.set('')
 
     def _update_events(self) -> None:
         """Fetch recent events and update the treeview table."""

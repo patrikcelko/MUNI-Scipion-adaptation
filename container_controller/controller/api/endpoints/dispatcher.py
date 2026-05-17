@@ -89,14 +89,16 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
     ip_str = f'[{resolved_ip}]' if ':' in resolved_ip else resolved_ip
     port_part = f':{parsed.port}' if parsed.port else ''
 
-    safe_url = urlunparse((
-        parsed.scheme,
-        f'{ip_str}{port_part}',
-        parsed.path,
-        parsed.params,
-        parsed.query,
-        parsed.fragment,
-    ))
+    safe_url = urlunparse(
+        (
+            parsed.scheme,
+            f'{ip_str}{port_part}',
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
     try:
         req = urllib.request.Request(safe_url, method='GET')
         req.add_header('User-Agent', 'Scipion-Controller/1.0')

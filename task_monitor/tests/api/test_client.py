@@ -209,3 +209,20 @@ def test_path_segments_are_url_encoded(
     getattr(client, method)(*args)
     url = mock_urlopen.call_args[0][0].full_url
     assert '%2Fwith%20spaces' in url
+
+
+@patch(_URLOPEN)
+def test_run_cleanup_returns_correct_shape(mock_urlopen: MagicMock, mock_response: MagicMock) -> None:
+    """run_cleanup passes through the real /api/cleanup/run response shape."""
+
+    payload = {'deleted_ttl': 2, 'deleted_cap': 1, 'evicted': 0}
+    mock_urlopen.return_value = mock_response(payload)
+    result = ControllerClient(_BASE).run_cleanup()
+
+    assert result == payload
+
+    assert isinstance(result, dict)
+    assert 'deleted' not in result
+    assert 'deleted_ttl' in result
+    assert 'deleted_cap' in result
+    assert 'evicted' in result

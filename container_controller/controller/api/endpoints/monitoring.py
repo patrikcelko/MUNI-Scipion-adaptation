@@ -85,4 +85,3 @@ async def api_logs(
         return {'pod': pod_name, 'lines': logs.split('\n') if logs else []}
     except Exception as exc:
         return JSONResponse({'pod': pod_name, 'error': str(exc), 'lines': []}, status_code=500)
-

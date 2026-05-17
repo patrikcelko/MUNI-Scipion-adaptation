@@ -225,7 +225,8 @@ class DispatcherBackend(InfraBackend):
         if task_id:
             logger.warning(
                 'Removed Dispatcher task %s for job %s from local tracking. ',
-                task_id, job_name,
+                task_id,
+                job_name,
             )
 
     def list_pods(self, namespace: str) -> list[dict[str, Any]]:
@@ -293,10 +294,10 @@ class DispatcherBackend(InfraBackend):
         max_finished_jobs: int,
     ) -> dict[str, int]:
         """Remove completed tasks from local tracking. Applies two removal strategies:
-            - TTL-based: any DONE/FAILED task whose submission time is older
-              than jobs_ttl seconds is removed.
-            - Cap-based: if the remaining finished tasks exceed
-              max_finished_jobs, the oldest surplus entries are removed.
+        - TTL-based: any DONE/FAILED task whose submission time is older
+          than jobs_ttl seconds is removed.
+        - Cap-based: if the remaining finished tasks exceed
+          max_finished_jobs, the oldest surplus entries are removed.
         """
 
         now: float = time.time()
