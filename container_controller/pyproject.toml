@@ -2,7 +2,7 @@
 name = "scipion-container-controller"
 version = "11.0.0"
 description = "Scipion Kubernetes job controller, translates qsub/qstat/qdel into Kubernetes Jobs"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 
 dependencies = [
     "fastapi>=0.115.0",
@@ -60,7 +60,7 @@ ignore = [
 "tests/*" = ["S101", "SLF001", "ARG"]
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingImports = true
 reportMissingTypeStubs = false

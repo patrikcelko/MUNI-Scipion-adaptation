@@ -2,7 +2,7 @@
 name = "scipion-task-monitor"
 version = "1.0.0"
 description = "Dashboard for monitoring Scipion jobs, pods, metrics, and logs"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 
 [project.optional-dependencies]
 test = [
@@ -50,7 +50,7 @@ ignore = [
 "tests/*" = ["S101", "SLF001", "ARG"]
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingImports = true
 reportMissingTypeStubs = false
