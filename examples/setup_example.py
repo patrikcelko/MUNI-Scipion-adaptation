@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import traceback
+import urllib.request
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,7 +34,6 @@ SCIPION_USER_DATA: Path = Path(
 )
 
 EMPIAR_CANDIDATES: list[Path] = [
-    Path('/projects') / 'EMPIAR',
     Path('/data') / 'EMPIAR',
     SCIPION_USER_DATA / 'EMPIAR',
     SCIPION_USER_DATA / 'projects' / 'Example' / 'EMPIAR',
@@ -41,6 +41,15 @@ EMPIAR_CANDIDATES: list[Path] = [
 ]
 
 PIPELINE_DIR: Path = Path('/opt/startup/pipelines')
+
+# Public EMPIAR-10248 (apoferritin)
+_EMPIAR_BASE = (
+    'https://ftp.ebi.ac.uk/empiar/world_availability/10248/data/Movies/'
+)
+
+_EMPIAR_MOVIE_TMPL = '190117_02_{idx:05d}_UnderDefocus0.7um_frameImage.tiff'
+_EMPIAR_GAIN = 'gain.mrc'
+EMPIAR_N_MOVIES: int = int(os.environ.get('EMPIAR_N_MOVIES', '5'))
 
 
 @dataclass
@@ -164,6 +173,43 @@ def find_empiar_dir() -> Path | None:
     return None
 
 
+def download_empiar_data(dest: Path, n_movies: int = EMPIAR_N_MOVIES) -> bool:
+    """Download a minimal EMPIAR-10248 subset (gain.mrc + n_movies TIFFs)."""
+
+    dest.mkdir(parents=True, exist_ok=True)
+
+    files: list[str] = [_EMPIAR_GAIN] + [
+        _EMPIAR_MOVIE_TMPL.format(idx=i) for i in range(1, n_movies + 1)
+    ]
+
+    ok = True
+    for fname in files:
+        out_path = dest / fname
+        if out_path.exists():
+            log(f'EMPIAR: already have {fname}, skipping')
+            continue
+
+        url = _EMPIAR_BASE + fname
+        log(f'EMPIAR: downloading {fname} ...')
+
+        tmp_path = None
+        try:
+            tmp_path = out_path.with_suffix('.tmp')
+            urllib.request.urlretrieve(url, tmp_path)
+            tmp_path.rename(out_path)
+            size_mb = out_path.stat().st_size / 1024 / 1024
+            log(f'EMPIAR: saved {fname} ({size_mb:.0f} MB)')
+        except Exception as exc:
+            log(f'EMPIAR: failed to download {fname}: {exc}')
+
+            if tmp_path and tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+
+            ok = False
+
+    return ok
+
+
 def patch_workflow_paths(
     workflow: list[dict[str, Any]], empiar_dir: Path
 ) -> list[dict[str, Any]]:
@@ -240,13 +286,28 @@ def main() -> int:
     log('Starting Scipion Example Projects auto setup.')
 
     force = '--force' in sys.argv
+    download = '--download' in sys.argv
 
     (SCIPION_USER_DATA / 'projects').mkdir(parents=True, exist_ok=True)
     verify_scipion_config()
 
+    projects = [p for p in EXAMPLE_PROJECTS if p.enabled]
+    if not projects:
+        log('All projects are disabled - nothing to do')
+        return 0
+
     empiar_dir = find_empiar_dir()
     if empiar_dir is None:
-        if force:
+        if download:
+            dest = Path('/data/EMPIAR')
+            log(f'EMPIAR data not found - downloading {EMPIAR_N_MOVIES} movies to {dest}...')
+
+            if download_empiar_data(dest):
+                empiar_dir = dest
+            else:
+                log('EMPIAR download incomplete - using placeholder paths')
+                empiar_dir = dest
+        elif force:
             empiar_dir = Path('/projects/EMPIAR')
             empiar_dir.mkdir(parents=True, exist_ok=True)
 
@@ -258,11 +319,6 @@ def main() -> int:
             return 0
     else:
         log(f'EMPIAR data found: {empiar_dir}')
-
-    projects = [p for p in EXAMPLE_PROJECTS if p.enabled]
-    if not projects:
-        log('All projects are disabled - nothing to do')
-        return 0
 
     log(f'Creating {len(projects)} project(s) ({len(EXAMPLE_PROJECTS) - len(projects)} disabled)...')
 
@@ -281,3 +337,4 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.exit(main())
+

@@ -147,10 +147,9 @@ ln -sf "${HOME}/.config/scipion/scipion.conf" "${SCIPION_HOME}/config/scipion.co
 log "Linked ${SCIPION_HOME}/config -> ${HOME}/.config/scipion"
 
 # Setup example project before starting VNC
-# TODO: Remove?
 if [ -f "/opt/startup/setup_example.py" ]; then
-  log "Setting up example project..."
-  if ! /opt/scipion/scipion3 run python3 /opt/startup/setup_example.py >> /tmp/setup_example.log 2>&1; then
+  log "Setting up example projects..."
+  if ! /opt/scipion/scipion3 run python3 /opt/startup/setup_example.py --download >> /tmp/setup_example.log 2>&1; then
     log "Warning: Example setup failed (see /tmp/setup_example.log)"
   fi
 fi

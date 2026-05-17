@@ -35,9 +35,9 @@ CLUSTER_TYPE="${CLUSTER_TYPE:-microk8s}"
 # kubectl binary - resolved in check_tools based on CLUSTER_TYPE
 KUBECTL=""
 
-# Latest image tags
-GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-v1.0.9}"
-CTRL_IMAGE_TAG="${CTRL_IMAGE_TAG:-v11}"
+# Image tags
+GUI_IMAGE_TAG="${GUI_IMAGE_TAG:-latest}"
+CTRL_IMAGE_TAG="${CTRL_IMAGE_TAG:-latest}"
 
 # Storage class - auto-detected in check_tools when left empty
 STORAGE_CLASS="${STORAGE_CLASS:-}"
@@ -146,8 +146,8 @@ do_deploy() {
         --set "vnc.password=${VNC_PASSWORD}"
         --set "image.tag=${GUI_IMAGE_TAG}"
         --set "controller.image.tag=${CTRL_IMAGE_TAG}"
-        --set "image.pullPolicy=IfNotPresent"
-        --set "controller.image.pullPolicy=IfNotPresent"
+        --set "image.pullPolicy=$([[ "$GUI_IMAGE_TAG" == latest ]] && echo Always || echo IfNotPresent)"
+        --set "controller.image.pullPolicy=$([[ "$CTRL_IMAGE_TAG" == latest ]] && echo Always || echo IfNotPresent)"
         --set "service.nodePort=${NODE_PORT_GUI}"
         --set "controller.service.nodePort=${NODE_PORT_CTRL}"
         --set "ingress.enabled=false"
@@ -232,8 +232,8 @@ do_help() {
     echo -e "${BOLD}ENVIRONMENT VARIABLES${NC}"
     echo -e "  ${CYAN}CLUSTER_TYPE${NC}      Local back-end: microk8s | k8s (default: microk8s)"
     echo -e "  ${CYAN}VNC_PASSWORD${NC}      VNC password (auto-generated if unset)"
-    echo -e "  ${CYAN}GUI_IMAGE_TAG${NC}     GUI image tag to deploy (default: v1.0.9)"
-    echo -e "  ${CYAN}CTRL_IMAGE_TAG${NC}    Controller image tag to deploy (default: v11)"
+    echo -e "  ${CYAN}GUI_IMAGE_TAG${NC}     GUI image tag to deploy (default: latest)"
+    echo -e "  ${CYAN}CTRL_IMAGE_TAG${NC}    Controller image tag to deploy (default: latest)"
     echo -e "  ${CYAN}STORAGE_CLASS${NC}     Kubernetes storage class (default: auto-detected)"
     echo -e "  ${CYAN}NODE_PORT_GUI${NC}     NodePort for the noVNC GUI (default: 31335)"
     echo -e "  ${CYAN}NODE_PORT_CTRL${NC}    NodePort for the controller API (default: 30080)"

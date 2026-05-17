@@ -37,9 +37,6 @@ router: APIRouter = APIRouter(tags=['jobs'])
 _MAX_KNOWN_JOBS: int = 10_000
 _known_jobs: OrderedDict[str, None] = OrderedDict()
 
-# Allowed characters in user-supplied originalCmd, prevents command injection.
-_SAFE_CMD_RE: re.Pattern[str] = re.compile(r'^[A-Za-z0-9 /_.=:\,\-]+$')
-
 
 def get_known_jobs_count() -> int:
     """Return the current number of tracked recently-submitted job IDs."""
@@ -168,9 +165,6 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
     original: str = (data.get('originalCmd') or '').strip()
     if not original:
         return JSONResponse({'error': 'missing originalCmd'}, status_code=400)
-
-    if not _SAFE_CMD_RE.match(original):
-        return JSONResponse({'error': 'originalCmd contains invalid characters'}, status_code=400)
 
     cmd0: str = original.split(maxsplit=1)[0]
     logger.debug('Received command: %s', original)

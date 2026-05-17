@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: scipion-controller-config
+  name: container-controller-config
   labels:
 {{ include "scipion3-remote.labels" . | indent 4 }}
 data:

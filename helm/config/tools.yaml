@@ -50,7 +50,7 @@
 
 # Scipion framework (+ unmatched protocols)
 - match: "^python3.*"
-  image: harbor.celko.cz/scipion-adaptation/scipion3-remote:v1.0.9
+  image: harbor.celko.cz/scipion-adaptation/scipion3-remote:latest
   needsGpu: false
   default: true
   enabled: true

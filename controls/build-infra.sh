@@ -42,7 +42,7 @@ REGISTRY="${REGISTRY:-harbor.celko.cz/scipion-adaptation}"
 
 # Image names as published to the registry
 GUI_IMAGE="${GUI_IMAGE:-scipion3-remote}"
-CTRL_IMAGE="${CTRL_IMAGE:-scipion-controller}"
+CTRL_IMAGE="${CTRL_IMAGE:-container-controller}"
 
 # shellcheck source=controls/common/registry.sh
 source "$COMMON_DIR/registry.sh"
@@ -182,7 +182,7 @@ do_help() {
     echo -e "${BOLD}ENVIRONMENT VARIABLES${NC}"
     echo -e "  ${CYAN}REGISTRY${NC}    Docker registry base URL (default: harbor.celko.cz/scipion-adaptation)"
     echo -e "  ${CYAN}GUI_IMAGE${NC}   GUI image name (default: scipion3-remote)"
-    echo -e "  ${CYAN}CTRL_IMAGE${NC}  Controller image name (default: scipion-controller)"
+    echo -e "  ${CYAN}CTRL_IMAGE${NC}  Controller image name (default: container-controller)"
     echo -e ""
 }
 

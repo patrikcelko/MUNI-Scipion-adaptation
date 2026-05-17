@@ -21,7 +21,7 @@ from monitor.api.types import (
     PodListData,
 )
 
-DEFAULT_URL = 'http://localhost:30080'
+DEFAULT_URL = 'http://container-controller:5000'
 """Default controller URL."""
 
 _TIMEOUT_GET = 5

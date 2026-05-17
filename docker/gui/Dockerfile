@@ -74,8 +74,7 @@ COPY task_monitor/monitor/ /opt/startup/monitor/
 # Queue proxy script
 COPY docker/gui/scripts/task-submit.sh /usr/local/bin/task-submit.sh
 
-# Example project auto-setup script (lives with other examples)
-# TODO: Remove?
+# Example project auto-setup script
 COPY examples/setup_example.py /opt/startup/setup_example.py
 
 # Scipion configuration files
@@ -89,7 +88,6 @@ COPY docker/tools/xmipp/patches/wrap_xmipp_imports.py /opt/startup/wrap_xmipp_im
 COPY docker/tools/xmipp/patches/xmipp3_robustness.py /opt/startup/xmipp3_robustness.py
 
 # Example pipelines
-# TODO: Remove?
 COPY examples/pipelines/ /opt/startup/pipelines/
 
 # Install Scipion plugins

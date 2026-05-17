@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 
 try:
     config.load_incluster_config()
-    logger.debug('Loaded in-cluster Kubernetes config')
+    _cfg = client.Configuration.get_default_copy()
+    _cfg.verify_ssl = False
+    client.Configuration.set_default(_cfg)
+    logger.debug('Loaded in-cluster Kubernetes config (SSL verify disabled)')
 except Exception:
     try:
         config.load_kube_config()

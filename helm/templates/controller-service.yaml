@@ -4,13 +4,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: scipion-controller
+  name: container-controller
   labels:
 {{ include "scipion3-remote.labels" . | indent 4 }}
 spec:
   type: {{ $ctl.service.type }}
   selector:
-    app.kubernetes.io/name: scipion-controller
+    app.kubernetes.io/name: container-controller
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
   - name: http

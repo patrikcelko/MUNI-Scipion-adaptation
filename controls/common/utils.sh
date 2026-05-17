@@ -28,7 +28,7 @@ do_logs() {
 
     info "Tailing controller logs for release '$RELEASE' in namespace '$NAMESPACE'..."
     $kctl logs -n "$NAMESPACE" \
-        -l "app.kubernetes.io/name=scipion-controller,app.kubernetes.io/instance=${RELEASE}" \
+        -l "app.kubernetes.io/name=container-controller,app.kubernetes.io/instance=${RELEASE}" \
         --tail=200 -f
 }
 

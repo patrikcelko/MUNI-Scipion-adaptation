@@ -4,22 +4,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: scipion-controller
+  name: container-controller
   labels:
 {{ include "scipion3-remote.labels" . | indent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: scipion-controller
+      app.kubernetes.io/name: container-controller
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: scipion-controller
+        app.kubernetes.io/name: container-controller
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      serviceAccountName: scipion-controller
+      serviceAccountName: container-controller
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -79,8 +79,8 @@ spec:
         - name: projects
           mountPath: "{{ $ctl.localPath }}"
 {{- if $ctl.onedata.enabled }}
-        - name: onedata-mnt
-          mountPath: /onedata
+        - name: datasets-vol
+          mountPath: /datasets
 {{- end }}
         resources:
 {{ toYaml ($ctl.resources | default (dict)) | indent 10 }}
@@ -117,20 +117,20 @@ spec:
           capabilities:
             add: ["SYS_ADMIN"]
         volumeMounts:
-          - name: onedata-mnt
-            mountPath: /onedata
+          - name: datasets-vol
+            mountPath: /datasets
             mountPropagation: Bidirectional
 {{- end }}
 
       volumes:
       - name: config
         configMap:
-          name: scipion-controller-config
+          name: container-controller-config
       - name: projects
         persistentVolumeClaim:
           claimName: {{ $ctl.projectsPVC }}
 {{- if $ctl.onedata.enabled }}
-      - name: onedata-mnt
+      - name: datasets-vol
         emptyDir: {}
 {{- end }}
 {{- end }}

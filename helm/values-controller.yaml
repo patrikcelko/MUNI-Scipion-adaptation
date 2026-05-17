@@ -1,9 +1,9 @@
 controller:
   enabled: true
   image:
-    repository: harbor.celko.cz/scipion-adaptation/scipion-k8s-controller
-    tag: v11
-    pullPolicy: IfNotPresent
+    repository: harbor.celko.cz/scipion-adaptation/container-controller
+    tag: latest
+    pullPolicy: Always
 
   service:
     type: NodePort

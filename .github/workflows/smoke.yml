@@ -30,7 +30,7 @@ jobs:
         with:
           context: .
           file: docker/controller/Dockerfile
-          tags: scipion-controller:ci
+          tags: container-controller:ci
           outputs: type=docker,dest=/tmp/controller.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -99,7 +99,7 @@ jobs:
             -f helm/values.yaml \
             -f helm/values-controller.yaml \
             -f .github/smoke-values.yaml \
-            --set controller.image.repository=scipion-controller \
+            --set controller.image.repository=container-controller \
             --set controller.image.tag=ci \
             --set controller.image.pullPolicy=Never \
             --set controller.projectsPVC="${RELEASE}-scipion3-remote-data" \
@@ -109,27 +109,27 @@ jobs:
 
       - name: Wait for controller pod
         run: |
-          kubectl rollout status deployment/scipion-controller \
+          kubectl rollout status deployment/container-controller \
             -n "$NAMESPACE" \
             --timeout=120s
 
       - name: "[smoke] GET /healthz'"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/healthz)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/healthz)
 
           echo "Response: $BODY"
           echo "$BODY" | grep -q '^ok'
 
       - name: "[smoke] GET /"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/)
 
           echo "Response: $BODY"
           echo "$BODY" | grep -qi 'scipion'
 
       - name: "[smoke] GET /api/cleanup"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/cleanup)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/cleanup)
           echo "$BODY"
           echo "$BODY" | python3 -c "
 
@@ -146,7 +146,7 @@ jobs:
 
       - name: "[smoke] GET /openapi.json - all key routes registered"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/openapi.json)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/openapi.json)
           echo "$BODY" | python3 -c "
 
           import sys, json
@@ -173,7 +173,7 @@ jobs:
 
       - name: "[smoke] POST /submit"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/submit \
             -H 'Content-Type: application/json' \
             -d '{}')
@@ -183,7 +183,7 @@ jobs:
 
       - name: "[smoke] GET /api/disk"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/disk)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/disk)
           echo "$BODY"
           echo "$BODY" | python3 -c "
 
@@ -198,7 +198,7 @@ jobs:
 
       - name: "[smoke] RBAC - controller ServiceAccount can create/list/delete/patch Jobs"
         run: |
-          SA=scipion-controller
+          SA=container-controller
           echo "ServiceAccount: $SA"
 
           for VERB in create list delete patch; do
@@ -211,7 +211,7 @@ jobs:
 
       - name: "[smoke] RBAC - controller ServiceAccount can get/list/watch/delete Pods"
         run: |
-          SA=scipion-controller
+          SA=container-controller
           echo "ServiceAccount: $SA"
 
           for VERB in get list watch delete; do
@@ -236,17 +236,17 @@ jobs:
 
       - name: "[smoke] GET /status/<unknown-job>"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             http://localhost:5000/status/99999)
           echo "HTTP status: $STATUS"
 
           [ "$STATUS" = "200" ]
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s http://localhost:5000/status/99999)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s http://localhost:5000/status/99999)
           [ -z "$BODY" ]
 
       - name: "[smoke] POST /cancel/<invalid-k8s-name>"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/cancel/INVALID_ID)
           echo "HTTP status: $STATUS"
 
@@ -254,7 +254,7 @@ jobs:
 
       - name: "[smoke] GET /api/pods"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/pods)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/pods)
           echo "$BODY" | python3 -c "
 
           import sys, json
@@ -267,7 +267,7 @@ jobs:
 
       - name: "[smoke] GET /api/jobs"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/jobs)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/jobs)
           echo "$BODY" | python3 -c "
 
           import sys, json
@@ -280,7 +280,7 @@ jobs:
 
       - name: "[smoke] GET /api/events"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/events)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/events)
           echo "$BODY" | python3 -c "
 
           import sys, json
@@ -293,7 +293,7 @@ jobs:
 
       - name: "[smoke] GET /api/metrics"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/metrics)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf http://localhost:5000/api/metrics)
           echo "$BODY"
           echo "$BODY" | python3 -c "
 
@@ -308,9 +308,9 @@ jobs:
 
       - name: "[smoke] GET /api/images"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/images)
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/images)
           echo "HTTP status: $STATUS"
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s http://localhost:5000/api/images)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s http://localhost:5000/api/images)
           echo "$BODY"
           echo "$BODY" | python3 -c "
 
@@ -324,7 +324,7 @@ jobs:
 
       - name: "[smoke] POST /import_workflow"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/import_workflow \
             -H 'Content-Type: application/json' \
             -d '{}')
@@ -334,7 +334,7 @@ jobs:
 
       - name: "[smoke] POST /import_workflow (SSRF guard)"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/import_workflow \
             -H 'Content-Type: application/json' \
             -d '{"workflow_url": "http://169.254.169.254/latest/meta-data/"}')
@@ -344,7 +344,7 @@ jobs:
 
       - name: "[smoke] POST /import_workflow (non http/https)"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/import_workflow \
             -H 'Content-Type: application/json' \
             -d '{"workflow_url": "ftp://example.com/workflow.json"}')
@@ -354,7 +354,7 @@ jobs:
 
       - name: "[smoke] POST /api/cleanup/run"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf -X POST http://localhost:5000/api/cleanup/run)
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf -X POST http://localhost:5000/api/cleanup/run)
           echo "$BODY"
           echo "$BODY" | python3 -c "
 
@@ -368,7 +368,7 @@ jobs:
 
       - name: "[smoke] DELETE /api/job/<invalid-name>"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X DELETE http://localhost:5000/api/job/INVALID__NAME)
           echo "HTTP status: $STATUS"
 
@@ -376,7 +376,7 @@ jobs:
 
       - name: "[smoke] DELETE /api/pod/<invalid-name>"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X DELETE http://localhost:5000/api/pod/INVALID__NAME)
           echo "HTTP status: $STATUS"
 
@@ -384,7 +384,7 @@ jobs:
 
       - name: "[smoke] GET /api/logs/<invalid-pod-name>"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             http://localhost:5000/api/logs/INVALID__POD)
           echo "HTTP status: $STATUS"
 
@@ -392,7 +392,7 @@ jobs:
 
       - name: "[smoke] POST /submit (originalCmd injection guard)"
         run: |
-          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -s -o /dev/null -w "%{http_code}" \
             -X POST http://localhost:5000/submit \
             -H 'Content-Type: application/json' \
             -d '{"originalCmd": "python3 run.db; rm -rf /"}')
@@ -402,7 +402,7 @@ jobs:
 
       - name: "[smoke] RBAC - controller SA can get/list ConfigMaps and Secrets"
         run: |
-          SA=scipion-controller
+          SA=container-controller
 
           for RESOURCE in configmaps secrets; do
             for VERB in get list; do
@@ -416,7 +416,7 @@ jobs:
 
       - name: "[smoke] RBAC - controller SA cannot create/delete ConfigMaps or Secrets"
         run: |
-          SA=scipion-controller
+          SA=container-controller
 
           for RESOURCE in configmaps secrets; do
             for VERB in create delete; do
@@ -430,7 +430,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 1/10: POST /submit (spawn mock worker)"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf \
             -X POST http://localhost:5000/submit \
             -H 'Content-Type: application/json' \
             -d '{"originalCmd": "python3 Runs/000001_XmippProtMovieGain/logs/run.db", "resources": {"memoryMb": 512}}')
@@ -521,7 +521,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 6/10: /status/{jobNumber} returns DONE (empty body)"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- \
             curl -s "http://localhost:5000/status/$JOB_NUMBER")
           echo "Status body: '${BODY}'"
 
@@ -531,7 +531,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 7/10: /api/jobs lists job with phase=DONE"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- \
             curl -sf http://localhost:5000/api/jobs)
           echo "$BODY" | python3 -c "
 
@@ -556,7 +556,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 8/10: /api/logs returns [MOCK-WORKER] lines"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- \
             curl -s "http://localhost:5000/api/logs/$POD_NAME")
           echo "Log response: $BODY"
           echo "$BODY" | python3 -c "
@@ -579,7 +579,7 @@ jobs:
 
       - name: "[smoke] GET /api/logs/{pod_name}?tail=2 - query param capped"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- \
             curl -s "http://localhost:5000/api/logs/$POD_NAME?tail=2")
           echo "$BODY" | python3 -c "
 
@@ -599,7 +599,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 9/10: DELETE /api/job - K8s Job deleted"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf \
             -X DELETE "http://localhost:5000/api/job/$JOB_ID")
           echo "Delete response: $BODY"
           echo "$BODY" | python3 -c "
@@ -629,7 +629,7 @@ jobs:
 
       - name: "[smoke] JOB LIFECYCLE 10/10: /api/jobs no longer lists deleted job"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- \
             curl -sf http://localhost:5000/api/jobs)
           echo "$BODY" | python3 -c "
 
@@ -648,7 +648,7 @@ jobs:
 
       - name: "[smoke] POST /cancel/{jobNumber} - cancel happy path"
         run: |
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf \
             -X POST http://localhost:5000/submit \
             -H 'Content-Type: application/json' \
             -d '{"originalCmd": "python3 Runs/000001_XmippProtMovieGain/logs/run.db", "resources": {"memoryMb": 512}}')
@@ -658,7 +658,7 @@ jobs:
           CANCEL_JOB_ID="scipion-job-$CANCEL_NUMBER"
           echo "Cancelling $CANCEL_JOB_ID..."
 
-          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/container-controller -- curl -sf \
             -X POST "http://localhost:5000/cancel/$CANCEL_NUMBER")
           echo "Cancel response: $BODY"
           echo "$BODY" | python3 -c "
@@ -701,7 +701,7 @@ jobs:
           fi
 
           echo "=== Controller pod logs ==="
-          kubectl logs -n "$NAMESPACE" deployment/scipion-controller \
+          kubectl logs -n "$NAMESPACE" deployment/container-controller \
             --tail=100 2>/dev/null || true
           echo ""
 

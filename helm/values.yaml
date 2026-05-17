@@ -8,8 +8,8 @@ onedata:
 
 image:
   repository: harbor.celko.cz/scipion-adaptation/scipion3-remote
-  tag: v1.0.9
-  pullPolicy: IfNotPresent
+  tag: latest
+  pullPolicy: Always
 
 gpu:
   enabled: false
