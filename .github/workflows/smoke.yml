@@ -1,0 +1,418 @@
+name: Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-controller:
+    name: Build controller image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build controller image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/controller/Dockerfile
+          tags: scipion-controller:ci
+          outputs: type=docker,dest=/tmp/controller.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: controller-image
+          path: /tmp/controller.tar
+          retention-days: 1
+
+  smoke-controller:
+    name: Smoke deploy
+    runs-on: ubuntu-latest
+    needs: build-controller
+
+    env:
+      RELEASE: scipion-ci
+      NAMESPACE: scipion-smoke
+      VNC_PASS: smoketest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: scipion-ci
+          config: .github/kind-config.yaml
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Download controller image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: controller-image
+          path: /tmp
+
+      - name: Load controller image into kind
+        run: kind load image-archive /tmp/controller.tar --name scipion-ci
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Helm install (controller only, GUI stubbed out)
+        run: |
+          helm upgrade --install "$RELEASE" helm/ \
+            --namespace "$NAMESPACE" \
+            -f helm/values.yaml \
+            -f helm/values-controller.yaml \
+            -f .github/smoke-values.yaml \
+            --set controller.image.repository=scipion-controller \
+            --set controller.image.tag=ci \
+            --set controller.image.pullPolicy=Never \
+            --set controller.projectsPVC="${RELEASE}-scipion3-remote-data" \
+            --set vnc.password="$VNC_PASS" \
+            --set ingress.enabled=false \
+            --timeout 3m
+
+      - name: Wait for controller pod
+        run: |
+          kubectl rollout status deployment/scipion-controller \
+            -n "$NAMESPACE" \
+            --timeout=120s
+
+      - name: "[smoke] GET /healthz'"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/healthz)
+
+          echo "Response: $BODY"
+          echo "$BODY" | grep -q '^ok'
+
+      - name: "[smoke] GET /"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/)
+
+          echo "Response: $BODY"
+          echo "$BODY" | grep -qi 'scipion'
+
+      - name: "[smoke] GET /api/cleanup"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/cleanup)
+          echo "$BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+
+          assert 'thread_alive' in d, f'Missing thread_alive: {d}'
+          assert 'ttl_seconds' in d, f'Missing ttl_seconds: {d}'
+          assert d['thread_alive'], f'Cleanup thread is not alive: {d}'
+
+          print(f'Cleanup thread alive: {d[\"thread_alive\"]}')
+          "
+
+      - name: "[smoke] GET /openapi.json - all key routes registered"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/openapi.json)
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          schema = json.load(sys.stdin)
+          paths = schema.get('paths', {})
+          required = [
+              '/healthz', '/',
+              '/submit', '/status/{job_id}', '/cancel/{job_id}',
+              '/api/cleanup', '/api/cleanup/run',
+              '/api/disk', '/api/images',
+              '/api/job/{job_name}', '/api/pod/{pod_name}',
+              '/api/jobs', '/api/pods', '/api/events', '/api/metrics', '/api/logs/{pod_name}',
+              '/import_workflow',
+          ]
+
+          missing = [r for r in required if r not in paths]
+          if missing:
+              raise AssertionError(f'Missing routes in OpenAPI schema: {missing}')
+
+          print(f'All {len(required)} required routes present in OpenAPI schema')
+          print('Routes found:', sorted(paths.keys()))
+          "
+
+      - name: "[smoke] POST /submit"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/submit \
+            -H 'Content-Type: application/json' \
+            -d '{}')
+
+          echo "HTTP status: $STATUS"
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] GET /api/disk"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/disk)
+          echo "$BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'total_gi' in d, f'Missing total_gi: {d}'
+          assert 'free_gi' in d, f'Missing free_gi: {d}'
+
+          print(f'Disk: {d[\"used_gi\"]} GiB used / {d[\"total_gi\"]} GiB total')
+          "
+
+      - name: "[smoke] RBAC - controller ServiceAccount can create/list/delete/patch Jobs"
+        run: |
+          SA=scipion-controller
+          echo "ServiceAccount: $SA"
+
+          for VERB in create list delete patch; do
+            RESULT=$(kubectl auth can-i "$VERB" jobs \
+              --as="system:serviceaccount:${NAMESPACE}:${SA}" \
+              -n "$NAMESPACE")
+            echo "$VERB jobs -> $RESULT"
+            [ "$RESULT" = "yes" ]
+          done
+
+      - name: "[smoke] RBAC - controller ServiceAccount can get/list/watch/delete Pods"
+        run: |
+          SA=scipion-controller
+          echo "ServiceAccount: $SA"
+
+          for VERB in get list watch delete; do
+            RESULT=$(kubectl auth can-i "$VERB" pods \
+              --as="system:serviceaccount:${NAMESPACE}:${SA}" \
+              -n "$NAMESPACE")
+            echo "$VERB pods -> $RESULT"
+            [ "$RESULT" = "yes" ]
+          done
+
+      - name: "[smoke] PVC created and bound"
+        run: |
+          PVC="${RELEASE}-scipion3-remote-data"
+          echo "PVC: $PVC"
+
+          kubectl wait pvc "$PVC" \
+            -n "$NAMESPACE" \
+            --for=jsonpath='.status.phase=Bound' \
+            --timeout=60s
+
+          kubectl get pvc -n "$NAMESPACE"
+
+      - name: "[smoke] GET /status/<unknown-job>"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            http://localhost:5000/status/99999)
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "200" ]
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s http://localhost:5000/status/99999)
+          [ -z "$BODY" ]
+
+      - name: "[smoke] POST /cancel/<invalid-k8s-name>"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/cancel/INVALID_ID)
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] GET /api/pods"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/pods)
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'pods' in d, f'Missing pods key: {d}'
+
+          print(f'Pods: {len(d[\"pods\"])} found')
+          "
+
+      - name: "[smoke] GET /api/jobs"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/jobs)
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'jobs' in d, f'Missing jobs key: {d}'
+
+          print(f'Jobs: {len(d[\"jobs\"])} found')
+          "
+
+      - name: "[smoke] GET /api/events"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/events)
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'events' in d, f'Missing events key: {d}'
+
+          print(f'Events: {len(d[\"events\"])} found')
+          "
+
+      - name: "[smoke] GET /api/metrics"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf http://localhost:5000/api/metrics)
+          echo "$BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'nodes' in d, f'Missing nodes key: {d}'
+          assert 'pods' in d, f'Missing pods key: {d}'
+
+          print(f'Metrics: {len(d[\"nodes\"])} node(s), {len(d[\"pods\"])} pod(s) tracked')
+          "
+
+      - name: "[smoke] GET /api/images"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/api/images)
+          echo "HTTP status: $STATUS"
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s http://localhost:5000/api/images)
+          echo "$BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'nodes' in d or 'error' in d, f'Unexpected response shape: {d}'
+
+          print(f'api/images: {list(d.keys())}')
+          "
+
+      - name: "[smoke] POST /import_workflow"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/import_workflow \
+            -H 'Content-Type: application/json' \
+            -d '{}')
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] POST /import_workflow (SSRF guard)"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/import_workflow \
+            -H 'Content-Type: application/json' \
+            -d '{"workflow_url": "http://169.254.169.254/latest/meta-data/"}')
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] POST /import_workflow (non http/https)"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/import_workflow \
+            -H 'Content-Type: application/json' \
+            -d '{"workflow_url": "ftp://example.com/workflow.json"}')
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] POST /api/cleanup/run"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf -X POST http://localhost:5000/api/cleanup/run)
+          echo "$BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert isinstance(d, dict), f'Expected dict, got: {d}'
+
+          print(f'Cleanup result: {d}')
+          "
+
+      - name: "[smoke] DELETE /api/job/<invalid-name>"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X DELETE http://localhost:5000/api/job/INVALID__NAME)
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] DELETE /api/pod/<invalid-name>"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X DELETE http://localhost:5000/api/pod/INVALID__NAME)
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] GET /api/logs/<invalid-pod-name>"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            http://localhost:5000/api/logs/INVALID__POD)
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
+      - name: "[smoke] RBAC - controller SA can get/list ConfigMaps and Secrets"
+        run: |
+          SA=scipion-controller
+
+          for RESOURCE in configmaps secrets; do
+            for VERB in get list; do
+              RESULT=$(kubectl auth can-i "$VERB" "$RESOURCE" \
+                --as="system:serviceaccount:${NAMESPACE}:${SA}" \
+                -n "$NAMESPACE")
+              echo "$VERB $RESOURCE -> $RESULT"
+              [ "$RESULT" = "yes" ]
+            done
+          done
+
+      - name: "[smoke] RBAC - controller SA cannot create/delete ConfigMaps or Secrets"
+        run: |
+          SA=scipion-controller
+
+          for RESOURCE in configmaps secrets; do
+            for VERB in create delete; do
+              RESULT=$(kubectl auth can-i "$VERB" "$RESOURCE" \
+                --as="system:serviceaccount:${NAMESPACE}:${SA}" \
+                -n "$NAMESPACE") || true
+              echo "$VERB $RESOURCE -> $RESULT (expected: no)"
+              [ "$RESULT" = "no" ]
+            done
+          done
+
+      - name: Dump pod logs on failure
+        if: failure()
+        run: |
+          echo "=== All pods ==="
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo ""
+
+          echo "=== Controller pod logs ==="
+          kubectl logs -n "$NAMESPACE" deployment/scipion-controller \
+            --tail=100 2>/dev/null || true
+          echo ""
+
+          echo "=== Events ==="
+          kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -30

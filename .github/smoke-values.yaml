@@ -1,0 +1,27 @@
+# Smoke-test overrides for kind CI
+
+image:
+  repository: gcr.io/google-containers/pause
+  tag: "3.9"
+  pullPolicy: IfNotPresent
+
+# No GPU in CI runners
+gpu:
+  enabled: false
+
+# Minimal resources for the placeholder GUI pod
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+
+# Ingress not available in plain kind
+ingress:
+  enabled: false
+
+persistence:
+  storageClassName: standard
+  size: 1Gi

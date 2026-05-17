@@ -12,6 +12,7 @@ TODO.md
 Dispatcher-master/
 docs/
 helm/
+!helm/config/tools.yaml
 openstack/
 /tools/
 
