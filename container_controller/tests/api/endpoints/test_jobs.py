@@ -120,8 +120,6 @@ def test_submit_empty_cmd(client: Any) -> None:
     assert resp.status_code == 400
 
 
-
-
 @patch('controller.utilities.routing.load_toolmap', new=Mock(return_value=[]))
 def test_submit_no_matching_tool(client: Any) -> None:
     """Submit with no matching tool returns 422."""

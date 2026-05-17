@@ -72,7 +72,7 @@ ENV LANG=C.UTF-8 \
 # Runtime-only packages (no build tools, no desktop, no VNC)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates wget curl \
-    python3 python3-pip python3-venv python3-tk tk \
+    python3 python3-pip python3-venv python3-tk tk libpython3.10 \
     openmpi-bin libopenmpi3 \
     libfftw3-3 libfftw3-single3 libfftw3-double3 \
     libhdf5-103 libhdf5-cpp-103 \

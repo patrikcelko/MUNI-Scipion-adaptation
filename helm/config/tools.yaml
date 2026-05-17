@@ -8,14 +8,14 @@
 # Relion
 - protocol: ".*Relion"
   match: "^relion_.*"
-  image: harbor.celko.cz/scipion-adaptation/relion:v3
+  image: harbor.celko.cz/scipion-adaptation/relion:latest
   needsGpu: false
   enabled: true
 
 # Xmipp
 - protocol: "Xmipp"
   match: "^xmipp_.*"
-  image: harbor.celko.cz/scipion-adaptation/xmipp:v3
+  image: harbor.celko.cz/scipion-adaptation/xmipp:latest
   needsGpu: false
   gpu_protocols:
     - XmippProtMovieCorr
@@ -24,27 +24,27 @@
 # MotionCor2
 - protocol: ".*MotionCor"
   match: "^motioncor2(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/motioncor2:v2
+  image: harbor.celko.cz/scipion-adaptation/motioncor2:latest
   needsGpu: true
   enabled: false
 
 # CTFFind (Cistem suite)
 - protocol: "Cistem|.*CTFFind"
   match: "^ctffind4(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/ctffind4:v4
+  image: harbor.celko.cz/scipion-adaptation/ctffind4:latest
   needsGpu: false
   enabled: true
 
 # Gctf
 - protocol: ".*Gctf|ProtGctf"
   match: "^Gctf(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/gctf:v2
+  image: harbor.celko.cz/scipion-adaptation/gctf:latest
   needsGpu: true
   enabled: false
 
 # EMAN2
 - protocol: "Eman"
-  image: harbor.celko.cz/scipion-adaptation/eman2:v1
+  image: harbor.celko.cz/scipion-adaptation/eman2:latest
   needsGpu: false
   enabled: false
 

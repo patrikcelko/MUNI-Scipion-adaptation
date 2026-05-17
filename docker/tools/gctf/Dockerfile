@@ -21,18 +21,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+# Install Miniconda (required by scipion-em-gctf to create a conda env with cudatoolkit)
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/miniconda && \
+    rm /tmp/miniconda.sh
+ENV PATH="/opt/miniconda/bin:${PATH}"
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority flexible && \
+    conda config --set always_yes true && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
 # Install Scipion
 ENV SCIPION_HOME=/opt/scipion
-RUN pip3 install --no-cache-dir scipion-installer && \
+RUN /usr/bin/pip3 install --no-cache-dir scipion-installer && \
     mkdir -p ${SCIPION_HOME} && \
-    python3 -m scipioninstaller ${SCIPION_HOME} -noAsk
+    /usr/bin/python3 -m scipioninstaller ${SCIPION_HOME} -noAsk -venv
 
 # Install Gctf plugin (downloads Gctf binary)
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-gctf
-
-# Patch _libNone.Image (avoids AttributeError in container)
-COPY patch_libnone.py /tmp/patch_libnone.py
-RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
 
 # Runtime stage
 
@@ -56,6 +63,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy Scipion with Gctf from builder
 COPY --from=builder /opt/scipion /opt/scipion
+COPY --from=builder /opt/miniconda /opt/miniconda
+
+ENV PATH="/opt/miniconda/bin:${PATH}"
 
 # Add Scipion to PATH
 ENV PATH="${SCIPION_HOME}:$PATH"
