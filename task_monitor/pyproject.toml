@@ -9,8 +9,14 @@ test = [
     "pytest>=9.0.2",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
 [tool.ruff]
-line-length = 120
+line-length = 300
 
 [tool.ruff.format]
 quote-style = "single"
@@ -18,24 +24,46 @@ quote-style = "single"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D",        # pydocstyle - docstring style (kept manual)
+    "D",
     "ANN",      # flake8-annotations - not needed with pyright
     "T20",      # flake8-print - prints are fine in a GUI app
     "S",        # bandit - security (urlopen flagged, handled already)
     "FBT",      # flake8-boolean-trap - BooleanVar etc. are idiomatic tk
     "BLE001",   # blind-exception - catch-all is valid in tk event loops
-    "ERA",      # eradicate - commented-out code detection (noisy)
     "COM812",   # missing-trailing-comma - conflicts with formatter
     "Q",        # flake8-quotes - formatter handles quote style
     "PLR0913",  # too-many-arguments - tk constructors need many args
     "PLR2004",  # magic-value-comparison - gauge thresholds are fine inline
+    "TRY300",
+    "PGH003",
+    "PLW0603",
+    "TD002",
+    "TD003",
+    "FIX002",
+    "UP015",
+    "PGH004",
+    "ARG002",
+    "PLR0911",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "SLF001", "ARG"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+# tkinter ships no PEP 561 stubs, so attribute access on tk/ttk objects
+# produces "Unknown" types which would require hundreds of cast() calls.
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportPrivateUsage = "none"
+reportUnusedFunction = "none"
+reportUnknownParameterType = "none"

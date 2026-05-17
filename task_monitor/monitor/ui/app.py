@@ -214,13 +214,9 @@ class TaskMonitor(tk.Tk):
         ctrl_frame = tk.Frame(parent, bg=BG)
         ctrl_frame.pack(fill='x', padx=10, pady=(2, 2))
 
-        create_action_button(ctrl_frame, 'Kill Selected Job', RED, self._kill_selected_job).pack(
-            side='left', padx=(0, 4)
-        )
+        create_action_button(ctrl_frame, 'Kill Selected Job', RED, self._kill_selected_job).pack(side='left', padx=(0, 4))
         create_action_button(ctrl_frame, 'Kill Selected Pod', ORANGE, self._kill_selected_pod).pack(side='left', padx=4)
-        create_action_button(ctrl_frame, 'Cleanup Finished', YELLOW, self._force_cleanup, fg='#000000').pack(
-            side='left', padx=4
-        )
+        create_action_button(ctrl_frame, 'Cleanup Finished', YELLOW, self._force_cleanup, fg='#000000').pack(side='left', padx=4)
 
         self._cleanup_lbl = tk.Label(ctrl_frame, text='', bg=BG, fg=DIM, font=(FONT_FAMILY, 9))
         self._cleanup_lbl.pack(side='left', padx=8)
