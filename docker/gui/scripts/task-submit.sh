@@ -13,7 +13,7 @@ CTRL_URL="${CTRL_URL:-http://container-controller:5000}"
 HTTP_TIMEOUT="${HTTP_TIMEOUT:-30}"
 GPUS_DEFAULT="${GPUS:-0}"
 HOURS_DEFAULT="${HOURS:-2}"
-MEM_MB_DEFAULT="${MEM_MB:-4096}"
+MEM_MB_DEFAULT="${MEM_MB:-8192}"
 
 # Scipion places job scripts at <project>/Runs/<run_id>/tmp/run.job.
 # Walk up from the script directory to reach the project root.

@@ -223,9 +223,9 @@ async def submit(request: Request) -> dict[str, str] | JSONResponse:
     cleanup_cmd, chown_cmd = _build_cleanup_and_chown(project_root, run_dir) if run_dir else ('', '')
 
     try:
-        mem_mb: int = max(512, min(65536, int(res.get('memoryMb', 4096))))
+        mem_mb: int = max(512, min(65536, int(res.get('memoryMb', 8192))))
     except (ValueError, TypeError):
-        mem_mb = 4096
+        mem_mb = 8192
 
     full_shell_cmd: str = f'mkdir -p /home/scipion/ScipionUserData && ln -sfn /projects /home/scipion/ScipionUserData/projects && echo "localhost" > /tmp/pbs_nodefile && {cleanup_cmd}{tool_setup_cmd}{scipion_env_setup} && cd "{project_root}" && {command}{chown_cmd}'
 
@@ -304,14 +304,17 @@ def _build_tool_setup(protocol_name: str | None) -> str:
         cmd += 'echo "[TOOL-SETUP] Setting up Xmipp binary paths..." && ln -sfn /opt/scipion/software/em/xmipp-devel/dist/bin /opt/scipion/software/em/xmipp-devel/bin 2>/dev/null && echo "[TOOL-SETUP] Xmipp setup complete" && '
 
     elif 'Relion' in protocol_name:
+        # NOTE: Both relion-4.0 and relion-5.0 bin paths are populated intentionally.
         cmd += (
             'echo "[TOOL-SETUP] Setting up Relion environment..." && '
             'export RELION_HOME=/usr/local && '
-            'mkdir -p /opt/scipion/software/em/relion-4.0/bin && '
+            'mkdir -p /opt/scipion/software/em/relion-4.0/bin '
+            '/opt/scipion/software/em/relion-5.0/bin && '
             'for bin in /usr/local/bin/relion_*; do '
             '  ln -sf "$bin" '
-            '/opt/scipion/software/em/relion-4.0/bin/"$(basename "$bin")"'
-            ' 2>/dev/null; '
+            '/opt/scipion/software/em/relion-4.0/bin/"$(basename "$bin")" 2>/dev/null; '
+            '  ln -sf "$bin" '
+            '/opt/scipion/software/em/relion-5.0/bin/"$(basename "$bin")" 2>/dev/null; '
             'done && '
             f'{_RELION_PATCH_CMD}'
             'echo "[TOOL-SETUP] Relion setup complete..." && '

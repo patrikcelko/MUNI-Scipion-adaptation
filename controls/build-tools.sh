@@ -73,6 +73,7 @@ check_tools() {
 }
 
 # Build the Docker image for a single tool.
+# NOTE: When Dockerfile.gpu exists a second image tagged ${tool}-gpu is also built.
 do_build_tools() {
     local tool="$1"
     local tool_dir="$TOOLS_DIR/$tool"
@@ -88,6 +89,13 @@ do_build_tools() {
 
     do_build "$tool" "$tool_dir/Dockerfile" "$tool_dir"
     local rc=$?
+
+    # Build GPU variant when Dockerfile.gpu is present (tagged as ${tool}-gpu).
+    if [[ $rc -eq 0 && -f "$tool_dir/Dockerfile.gpu" ]]; then
+        info "GPU Dockerfile found for '$tool', building ${tool}-gpu variant..."
+        do_build "${tool}-gpu" "$tool_dir/Dockerfile.gpu" "$tool_dir"
+        rc=$?
+    fi
 
     [[ -n "$copied_patch" ]] && rm -f "$copied_patch"
 
@@ -119,6 +127,10 @@ do_push_action() {
     while IFS= read -r tool; do
         info "Tool: $tool..."
         do_push "$tool" || failed+=("$tool")
+        # Push GPU variant if Dockerfile.gpu exists.
+        if [[ -f "$TOOLS_DIR/$tool/Dockerfile.gpu" ]]; then
+            do_push "${tool}-gpu" || failed+=("${tool}-gpu")
+        fi
     done < <(resolve_tools "$TOOL")
 
     if [[ ${#failed[@]} -gt 0 ]]; then
@@ -135,7 +147,15 @@ do_build_push_action() {
 
     while IFS= read -r tool; do
         info "Tool: $tool..."
-        do_build_tools "$tool" && do_push "$tool" || failed+=("$tool")
+        if do_build_tools "$tool"; then
+            do_push "$tool" || failed+=("$tool")
+            # Push GPU variant if Dockerfile.gpu exists.
+            if [[ -f "$TOOLS_DIR/$tool/Dockerfile.gpu" ]]; then
+                do_push "${tool}-gpu" || failed+=("${tool}-gpu")
+            fi
+        else
+            failed+=("$tool")
+        fi
     done < <(resolve_tools "$TOOL")
 
     if [[ ${#failed[@]} -gt 0 ]]; then
