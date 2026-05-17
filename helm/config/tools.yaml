@@ -8,14 +8,14 @@
 # Relion
 - protocol: ".*Relion"
   match: "^relion_.*"
-  image: harbor.celko.cz/scipion-adaptation/relion:latest
+  image: cerit.io/scipion/relion:latest
   needsGpu: false
   enabled: true
 
 # Xmipp
 - protocol: "Xmipp"
   match: "^xmipp_.*"
-  image: harbor.celko.cz/scipion-adaptation/xmipp:latest
+  image: cerit.io/scipion/xmipp:latest
   needsGpu: false
   gpu_protocols:
     - XmippProtMovieCorr
@@ -24,33 +24,33 @@
 # MotionCor2
 - protocol: ".*MotionCor"
   match: "^motioncor2(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/motioncor2:latest
+  image: cerit.io/scipion/motioncor2:latest
   needsGpu: true
   enabled: false
 
 # CTFFind (Cistem suite)
 - protocol: "Cistem|.*CTFFind"
   match: "^ctffind4(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/ctffind4:latest
+  image: cerit.io/scipion/ctffind4:latest
   needsGpu: false
   enabled: true
 
 # Gctf
 - protocol: ".*Gctf|ProtGctf"
   match: "^Gctf(\\b|_)"
-  image: harbor.celko.cz/scipion-adaptation/gctf:latest
+  image: cerit.io/scipion/gctf:latest
   needsGpu: true
   enabled: false
 
 # EMAN2
 - protocol: "Eman"
-  image: harbor.celko.cz/scipion-adaptation/eman2:latest
+  image: cerit.io/scipion/eman2:latest
   needsGpu: false
   enabled: false
 
 # Scipion framework (+ unmatched protocols)
 - match: "^python3.*"
-  image: harbor.celko.cz/scipion-adaptation/scipion3-remote:latest
+  image: cerit.io/scipion/scipion3-remote:latest
   needsGpu: false
   default: true
   enabled: true

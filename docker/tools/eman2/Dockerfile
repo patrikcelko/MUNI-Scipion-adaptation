@@ -26,18 +26,21 @@ RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.s
     rm /tmp/miniconda.sh
 ENV PATH="/opt/miniconda/bin:${PATH}"
 
-# Install Scipion
+# Accept Anaconda ToS for required channels
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority flexible && \
+    conda config --set always_yes true && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
+# Install Scipion (use -venv to avoid conda env, /usr/bin/python3 to avoid Miniconda Python 3.13)
 ENV SCIPION_HOME=/opt/scipion
-RUN pip3 install --no-cache-dir scipion-installer && \
+RUN /usr/bin/pip3 install --no-cache-dir scipion-installer && \
     mkdir -p ${SCIPION_HOME} && \
-    python3 -m scipioninstaller ${SCIPION_HOME} -noAsk
+    /usr/bin/python3 -m scipioninstaller ${SCIPION_HOME} -noAsk -venv
 
 # Install EMAN2 plugin with binaries (conda-based)
 RUN ${SCIPION_HOME}/scipion3 installp -p scipion-em-eman2
-
-# Patch _libNone.Image (avoids AttributeError in container)
-COPY patch_libnone.py /tmp/patch_libnone.py
-RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
 
 # Clean conda caches (saves hundreds of MB)
 RUN conda clean --all --yes && \

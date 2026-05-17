@@ -38,7 +38,7 @@ esac
 # Configuration
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$REPO_DIR/docker"
-REGISTRY="${REGISTRY:-harbor.celko.cz/scipion-adaptation}"
+REGISTRY="${REGISTRY:-cerit.io/scipion}"
 
 # Image names as published to the registry
 GUI_IMAGE="${GUI_IMAGE:-scipion3-remote}"
@@ -180,7 +180,7 @@ do_help() {
     echo -e "  ${GREEN}help${NC}         Show this help message."
     echo -e ""
     echo -e "${BOLD}ENVIRONMENT VARIABLES${NC}"
-    echo -e "  ${CYAN}REGISTRY${NC}    Docker registry base URL (default: harbor.celko.cz/scipion-adaptation)"
+    echo -e "  ${CYAN}REGISTRY${NC}    Docker registry base URL (default: cerit.io/scipion)"
     echo -e "  ${CYAN}GUI_IMAGE${NC}   GUI image name (default: scipion3-remote)"
     echo -e "  ${CYAN}CTRL_IMAGE${NC}  Controller image name (default: container-controller)"
     echo -e ""

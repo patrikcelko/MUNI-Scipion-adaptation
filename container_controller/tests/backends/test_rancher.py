@@ -53,7 +53,7 @@ def test_rancher_submit_resources_cpu_requests_and_limits() -> None:
     backend.submit_job(
         namespace='rancher-ns',
         job_name='test-job',
-        image='harbor.celko.cz/scipion/xmipp:v3',
+        image='cerit.io/scipion/xmipp:v3',
         command=['/bin/bash', '-c', 'echo hello'],
         env={'FOO': 'bar'},
         labels={'app': 'scipion-worker', 'tool': 'xmipp'},
@@ -440,7 +440,7 @@ def test_rancher_admin_list_node_images() -> None:
         status=SimpleNamespace(
             images=[
                 SimpleNamespace(
-                    names=['harbor.celko.cz/scipion/xmipp:v3'],
+                    names=['cerit.io/scipion/xmipp:v3'],
                     size_bytes=1024 * 1024 * 500,
                 )
             ]

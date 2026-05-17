@@ -7,7 +7,7 @@ onedata:
   extraArgs: []
 
 image:
-  repository: harbor.celko.cz/scipion-adaptation/scipion3-remote
+  repository: cerit.io/scipion/scipion3-remote
   tag: latest
   pullPolicy: Always
 

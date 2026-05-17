@@ -73,11 +73,11 @@ def test_images_returns_node_images(client: Any) -> None:
         status=SimpleNamespace(
             images=[
                 SimpleNamespace(
-                    names=['harbor.celko.cz/scipion/xmipp:v3'],
+                    names=['cerit.io/scipion/xmipp:v3'],
                     size_bytes=500 * 1024 * 1024,
                 ),
                 SimpleNamespace(
-                    names=['harbor.celko.cz/scipion/relion:v3'],
+                    names=['cerit.io/scipion/relion:v3'],
                     size_bytes=200 * 1024 * 1024,
                 ),
             ]

@@ -1,7 +1,7 @@
 controller:
   enabled: true
   image:
-    repository: harbor.celko.cz/scipion-adaptation/container-controller
+    repository: cerit.io/scipion/container-controller
     tag: latest
     pullPolicy: Always
 

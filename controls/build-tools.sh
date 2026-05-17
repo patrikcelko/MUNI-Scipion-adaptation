@@ -28,7 +28,7 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 TOOLS_DIR="$REPO_DIR/docker/tools"
 
 # Docker registry stuff
-REGISTRY="${REGISTRY:-harbor.celko.cz/scipion-adaptation}"
+REGISTRY="${REGISTRY:-cerit.io/scipion}"
 COMMON_DIR="$SCRIPT_DIR/common"
 
 # shellcheck source=controls/common/logging.sh
@@ -201,7 +201,7 @@ do_help() {
     echo -e "  ${GREEN}help${NC}         Show this help message."
     echo -e ""
     echo -e "${BOLD}ENVIRONMENT VARIABLES${NC}"
-    echo -e "  ${CYAN}REGISTRY${NC}    Docker registry base URL (default: harbor.celko.cz/scipion-adaptation)"
+    echo -e "  ${CYAN}REGISTRY${NC}    Docker registry base URL (default: cerit.io/scipion)"
     echo -e ""
 }
 
