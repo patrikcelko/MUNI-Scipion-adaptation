@@ -75,10 +75,6 @@ RUN relion_refine --version 2>&1 | grep -i relion && \
 RUN mkdir -p /projects /data /datasets && \
     chmod 777 /projects /data /datasets
 
-# Create wrapper script for Scipion-based execution
-COPY scripts/relion-wrapper.sh /usr/local/bin/relion-wrapper.sh
-RUN chmod +x /usr/local/bin/relion-wrapper.sh
-
 WORKDIR /projects
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

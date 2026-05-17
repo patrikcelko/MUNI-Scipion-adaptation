@@ -77,9 +77,6 @@ RUN python3 /tmp/patch_libnone.py && rm /tmp/patch_libnone.py
 RUN mkdir -p /projects /data /datasets && \
     chmod 777 /projects /data /datasets
 
-COPY scripts/relion-wrapper.sh /usr/local/bin/relion-wrapper.sh
-RUN chmod +x /usr/local/bin/relion-wrapper.sh
-
 WORKDIR /projects
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
