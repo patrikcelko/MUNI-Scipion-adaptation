@@ -53,6 +53,8 @@ spec:
           value: "{{ $ctl.localPath }}"
         - name: TOOLMAP_PATH
           value: "/config/tools.yaml"
+        - name: WORKER_PULL_POLICY
+          value: "{{ default "Always" $ctl.workerPullPolicy }}"
         - name: ONEDATA_ENABLED
           value: "{{ $ctl.onedata.enabled }}"
         - name: ONECLIENT_IMAGE

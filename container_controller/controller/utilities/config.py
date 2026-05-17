@@ -56,6 +56,9 @@ class Settings:
     # Toolmap
     toolmap_path: str = '/config/tools.yaml'
 
+    # Worker pod image pull policy
+    worker_pull_policy: str = 'Always'
+
     # Backend
     backend: str = 'k8s'
 
@@ -158,6 +161,7 @@ def get_settings() -> Settings:
         oneclient_token_secret=os.environ.get('ONECLIENT_TOKEN_SECRET', 'onedata-credentials'),
         oneclient_extra=_safe_json('ONECLIENT_EXTRA', [], list),
         toolmap_path=os.environ.get('TOOLMAP_PATH', '/config/tools.yaml'),
+        worker_pull_policy=os.environ.get('WORKER_PULL_POLICY', 'Always'),
         backend=os.environ.get('BACKEND', 'k8s'),
         dispatcher_url=os.environ.get('DISPATCHER_URL', ''),
         dispatcher_token=os.environ.get('DISPATCHER_TOKEN', ''),

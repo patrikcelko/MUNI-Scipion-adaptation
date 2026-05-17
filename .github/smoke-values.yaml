@@ -1,5 +1,9 @@
 # Smoke-test overrides for kind CI
 
+controller:
+  # Use IfNotPresent so kind-loaded mock-worker
+  workerPullPolicy: "IfNotPresent"
+
 image:
   repository: gcr.io/google-containers/pause
   tag: "3.9"

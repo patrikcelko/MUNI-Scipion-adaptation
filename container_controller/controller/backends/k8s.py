@@ -49,7 +49,7 @@ class K8sBackend(InfraBackend):
         main_container: client.V1Container = client.V1Container(
             name='tool',
             image=image,
-            image_pull_policy='Always',
+            image_pull_policy=cfg.worker_pull_policy,
             command=command,
             volume_mounts=mounts,
             env=env_vars,

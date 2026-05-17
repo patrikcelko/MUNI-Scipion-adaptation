@@ -20,6 +20,8 @@ controller:
   jobsTTL: 600
   jobsCleanupInterval: 120
 
+  workerPullPolicy: "Always"
+
   onedata:
     enabled: false
     image: ""

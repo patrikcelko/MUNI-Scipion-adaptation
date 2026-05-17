@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build-controller:
-    name: Build controller image
+    name: Test controller
     runs-on: ubuntu-latest
 
     steps:
@@ -72,6 +72,22 @@ jobs:
 
       - name: Load controller image into kind
         run: kind load image-archive /tmp/controller.tar --name scipion-ci
+
+      - name: Build mock-worker image
+        run: |
+          docker build -t mock-worker:ci -f .github/mock-worker.Dockerfile .
+          echo "Built mock-worker:ci ($(docker image inspect mock-worker:ci --format '{{.Size}}' | numfmt --to=iec) on disk)"
+
+      - name: Load mock-worker image into kind
+        run: |
+          kind load docker-image mock-worker:ci --name scipion-ci
+          echo "mock-worker:ci loaded into kind cluster"
+
+      - name: Replace helm tools config with CI mock
+        run: |
+          cp .github/mock-tools.yaml helm/config/tools.yaml
+          echo "Activating CI tools config"
+          cat helm/config/tools.yaml
 
       - name: Create namespace
         run: kubectl create namespace "$NAMESPACE"
@@ -374,6 +390,16 @@ jobs:
 
           [ "$STATUS" = "400" ]
 
+      - name: "[smoke] POST /submit (originalCmd injection guard)"
+        run: |
+          STATUS=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://localhost:5000/submit \
+            -H 'Content-Type: application/json' \
+            -d '{"originalCmd": "python3 run.db; rm -rf /"}')
+          echo "HTTP status: $STATUS"
+
+          [ "$STATUS" = "400" ]
+
       - name: "[smoke] RBAC - controller SA can get/list ConfigMaps and Secrets"
         run: |
           SA=scipion-controller
@@ -402,12 +428,277 @@ jobs:
             done
           done
 
+      - name: "[smoke] JOB LIFECYCLE 1/10: POST /submit (spawn mock worker)"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+            -X POST http://localhost:5000/submit \
+            -H 'Content-Type: application/json' \
+            -d '{"originalCmd": "python3 Runs/000001_XmippProtMovieGain/logs/run.db", "resources": {"memoryMb": 512}}')
+          echo "Submit response: $BODY"
+
+          JOB_ID=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['jobId'])")
+          JOB_NUMBER=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['jobNumber'])")
+          echo "jobId=$JOB_ID  jobNumber=$JOB_NUMBER"
+
+          [[ "$JOB_ID" == scipion-job-* ]] || { echo "ERROR: unexpected jobId format: $JOB_ID"; exit 1; }
+
+          echo "JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
+          echo "JOB_NUMBER=$JOB_NUMBER" >> "$GITHUB_ENV"
+
+      - name: "[smoke] JOB LIFECYCLE 2/10: K8s Job object exists with correct spec"
+        run: |
+          echo "Verifying K8s Job: $JOB_ID"
+          kubectl get job "$JOB_ID" -n "$NAMESPACE" -o wide
+
+          BACKOFF=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.spec.backoffLimit}')
+          IMAGE=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].image}')
+          PULL=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}')
+          CMD0=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].command[0]}')
+
+          echo "image=$IMAGE pullPolicy=$PULL backoffLimit=$BACKOFF command[0]=$CMD0"
+
+          [ "$IMAGE" = "mock-worker:ci" ] || { echo "ERROR: wrong image: $IMAGE"; exit 1; }
+          [ "$PULL" = "IfNotPresent" ] || { echo "ERROR: wrong pullPolicy: $PULL"; exit 1; }
+          [ "$BACKOFF" = "0" ] || { echo "ERROR: wrong backoffLimit: $BACKOFF"; exit 1; }
+          [ "$CMD0" = "/bin/bash" ] || { echo "ERROR: wrong command[0]: $CMD0"; exit 1; }
+
+      - name: "[smoke] JOB LIFECYCLE 3/10: Worker pod spawned by K8s scheduler"
+        run: |
+          echo "Waiting up to 30 s for pod with label job=$JOB_ID..."
+
+          for i in $(seq 1 15); do
+            COUNT=$(kubectl get pods -l "job=$JOB_ID" -n "$NAMESPACE" \
+              --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            [ "$COUNT" -gt 0 ] && { echo "Pod appeared (attempt $i)"; break; }
+            echo "  attempt $i/15 - no pod yet, waiting 2 s..."
+            sleep 2
+          done
+
+          kubectl get pods -l "job=$JOB_ID" -n "$NAMESPACE" -o wide
+
+          COUNT=$(kubectl get pods -l "job=$JOB_ID" -n "$NAMESPACE" \
+            --no-headers 2>/dev/null | wc -l | tr -d ' ')
+          [ "$COUNT" -gt 0 ] || { echo "ERROR: no pod created for $JOB_ID"; exit 1; }
+
+          POD_NAME=$(kubectl get pods -l "job=$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.items[0].metadata.name}')
+          echo "Pod name: $POD_NAME"
+          echo "POD_NAME=$POD_NAME" >> "$GITHUB_ENV"
+
+      - name: "[smoke] JOB LIFECYCLE 4/10: Worker pod completes with exit code 0"
+        run: |
+          echo "Waiting up to 60 s for pod $POD_NAME to reach phase Succeeded..."
+
+          kubectl wait pod "$POD_NAME" -n "$NAMESPACE" \
+            --for=jsonpath='.status.phase=Succeeded' --timeout=60s
+
+          PHASE=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" \
+            -o jsonpath='{.status.phase}')
+          EXIT_CODE=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" \
+            -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}')
+
+          echo "Pod phase=$PHASE  exitCode=$EXIT_CODE"
+          [ "$PHASE" = "Succeeded" ] || { echo "ERROR: expected Succeeded, got $PHASE"; exit 1; }
+          [ "$EXIT_CODE" = "0" ] || { echo "ERROR: expected exitCode=0, got $EXIT_CODE"; exit 1; }
+
+      - name: "[smoke] JOB LIFECYCLE 5/10: K8s Job transitions to condition=Complete"
+        run: |
+          kubectl wait job "$JOB_ID" -n "$NAMESPACE" \
+            --for=condition=Complete --timeout=30s
+
+          SUCCEEDED=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.status.succeeded}')
+          FAILED=$(kubectl get job "$JOB_ID" -n "$NAMESPACE" \
+            -o jsonpath='{.status.failed}')
+
+          echo "Job succeeded=$SUCCEEDED  failed=${FAILED:-0}"
+          [ "$SUCCEEDED" = "1" ] || { echo "ERROR: expected succeeded=1, got $SUCCEEDED"; exit 1; }
+          [ -z "$FAILED" ] || [ "$FAILED" = "0" ] || { echo "ERROR: unexpected failures: $FAILED"; exit 1; }
+
+      - name: "[smoke] JOB LIFECYCLE 6/10: /status/{jobNumber} returns DONE (empty body)"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+            curl -s "http://localhost:5000/status/$JOB_NUMBER")
+          echo "Status body: '${BODY}'"
+
+          [ -z "$BODY" ] || { echo "ERROR: expected empty body (DONE), got: '$BODY'"; exit 1; }
+
+          echo "Confirmed: /status/$JOB_NUMBER returns empty body - job is DONE"
+
+      - name: "[smoke] JOB LIFECYCLE 7/10: /api/jobs lists job with phase=DONE"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+            curl -sf http://localhost:5000/api/jobs)
+          echo "$BODY" | python3 -c "
+
+          import sys, json, os
+
+          d = json.load(sys.stdin)
+          job_id = os.environ['JOB_ID']
+          jobs_map = {j['name']: j for j in d.get('jobs', [])}
+
+          assert job_id in jobs_map, \
+            f'Job {job_id} missing from /api/jobs - found: {list(jobs_map)}'
+
+          j = jobs_map[job_id]
+          assert j['phase'] == 'DONE', f'Expected phase=DONE, got {j[\"phase\"]!r}'
+          assert j['succeeded'] == 1, f'Expected succeeded=1, got {j[\"succeeded\"]}'
+          assert j['failed'] == 0, f'Expected failed=0, got {j[\"failed\"]}'
+          assert j['active'] == 0, f'Expected active=0, got {j[\"active\"]}'
+
+          print(f'Job {job_id}: phase={j[\"phase\"]}, succeeded={j[\"succeeded\"]}, '
+                f'failed={j[\"failed\"]}, age={j[\"age\"]}')
+          "
+
+      - name: "[smoke] JOB LIFECYCLE 8/10: /api/logs returns [MOCK-WORKER] lines"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+            curl -s "http://localhost:5000/api/logs/$POD_NAME")
+          echo "Log response: $BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'lines' in d, f'Missing lines key: {d}'
+
+          lines = d['lines']
+          print(f'{len(lines)} log line(s) returned:')
+          for l in lines:
+              print(f'  {l}')
+
+          joined = '\n'.join(lines)
+          assert 'MOCK-WORKER' in joined, \
+            f'Expected [MOCK-WORKER] marker in logs, got: {joined!r}'
+          print('Mock-worker log lines confirmed.')
+          "
+
+      - name: "[smoke] GET /api/logs/{pod_name}?tail=2 - query param capped"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+            curl -s "http://localhost:5000/api/logs/$POD_NAME?tail=2")
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert 'lines' in d, f'Missing lines key: {d}'
+
+          non_empty = [l for l in d['lines'] if l]
+          print(f'tail=2 returned {len(non_empty)} non-empty line(s): {non_empty}')
+
+          assert len(non_empty) <= 2, \
+            f'Expected at most 2 lines with tail=2, got {len(non_empty)}: {non_empty}'
+
+          print('tail query param respected.')
+          "
+
+      - name: "[smoke] JOB LIFECYCLE 9/10: DELETE /api/job - K8s Job deleted"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+            -X DELETE "http://localhost:5000/api/job/$JOB_ID")
+          echo "Delete response: $BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json, os
+
+          d = json.load(sys.stdin)
+          job_id = os.environ['JOB_ID']
+          assert d.get('deleted') == job_id, \
+            f'Expected deleted={job_id!r}, got {d!r}'
+
+          print(f'Controller confirmed deletion of {job_id}')
+          "
+
+          echo "Waiting up to 30 s for K8s Job $JOB_ID to disappear..."
+          for i in $(seq 1 15); do
+            kubectl get job "$JOB_ID" -n "$NAMESPACE" 2>/dev/null || \
+              { echo "Job gone (attempt $i)"; break; }
+            echo "  attempt $i/15 - still present, waiting 2 s..."
+            sleep 2
+          done
+
+          kubectl get job "$JOB_ID" -n "$NAMESPACE" 2>/dev/null && \
+            { echo "ERROR: K8s Job $JOB_ID still exists after delete"; exit 1; } || true
+
+          echo "K8s Job $JOB_ID is gone from the cluster."
+
+      - name: "[smoke] JOB LIFECYCLE 10/10: /api/jobs no longer lists deleted job"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- \
+            curl -sf http://localhost:5000/api/jobs)
+          echo "$BODY" | python3 -c "
+
+          import sys, json, os
+
+          d = json.load(sys.stdin)
+          job_id = os.environ['JOB_ID']
+          names = [j['name'] for j in d.get('jobs', [])]
+
+          assert job_id not in names, \
+            f'ERROR: {job_id} still visible in /api/jobs after delete: {names}'
+
+          print(f'Confirmed: {job_id} absent from /api/jobs after deletion.')
+          print(f'Remaining jobs in namespace: {len(names)}')
+          "
+
+      - name: "[smoke] POST /cancel/{jobNumber} - cancel happy path"
+        run: |
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+            -X POST http://localhost:5000/submit \
+            -H 'Content-Type: application/json' \
+            -d '{"originalCmd": "python3 Runs/000001_XmippProtMovieGain/logs/run.db", "resources": {"memoryMb": 512}}')
+          echo "Cancel-test submit: $BODY"
+
+          CANCEL_NUMBER=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['jobNumber'])")
+          CANCEL_JOB_ID="scipion-job-$CANCEL_NUMBER"
+          echo "Cancelling $CANCEL_JOB_ID..."
+
+          BODY=$(kubectl exec -n "$NAMESPACE" deployment/scipion-controller -- curl -sf \
+            -X POST "http://localhost:5000/cancel/$CANCEL_NUMBER")
+          echo "Cancel response: $BODY"
+          echo "$BODY" | python3 -c "
+
+          import sys, json
+
+          d = json.load(sys.stdin)
+          assert d.get('ok') is True, f'Expected ok=true, got {d!r}'
+          print(f'Cancel confirmed: ok={d[\"ok\"]}')
+          "
+
+          echo "Waiting up to 20 s for $CANCEL_JOB_ID to disappear..."
+          for i in $(seq 1 10); do
+            kubectl get job "$CANCEL_JOB_ID" -n "$NAMESPACE" 2>/dev/null || \
+              { echo "Job gone (attempt $i)"; break; }
+            echo "  attempt $i/10 - still present, waiting 2 s..."
+            sleep 2
+          done
+
+          kubectl get job "$CANCEL_JOB_ID" -n "$NAMESPACE" 2>/dev/null && \
+            { echo "ERROR: $CANCEL_JOB_ID still exists after cancel"; exit 1; } || true
+
+          echo "K8s Job $CANCEL_JOB_ID is gone after cancel."
+
       - name: Dump pod logs on failure
         if: failure()
         run: |
           echo "=== All pods ==="
           kubectl get pods -n "$NAMESPACE" -o wide
           echo ""
+
+          echo "=== All jobs ==="
+          kubectl get jobs -n "$NAMESPACE" -o wide
+          echo ""
+
+          if [ -n "${JOB_ID:-}" ]; then
+            echo "=== Worker pod logs for $JOB_ID ==="
+            kubectl logs -n "$NAMESPACE" -l "job=$JOB_ID" --tail=50 2>/dev/null || true
+            echo ""
+          fi
 
           echo "=== Controller pod logs ==="
           kubectl logs -n "$NAMESPACE" deployment/scipion-controller \

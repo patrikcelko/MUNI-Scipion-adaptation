@@ -1,0 +1,7 @@
+# CI-only tool mapping for smoke tests. Routes every protocol
+# to the local mock-worker image.
+- match: ".*"
+  image: mock-worker:ci
+  needsGpu: false
+  default: true
+  enabled: true
