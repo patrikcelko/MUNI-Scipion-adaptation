@@ -28,9 +28,6 @@ rules:
   resources: ["events"]
   verbs: ["get","list","watch"]
 - apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get","list"]
-- apiGroups: [""]
   resources: ["configmaps","secrets"]
   verbs: ["get","list"]
 ---

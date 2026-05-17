@@ -55,6 +55,8 @@ spec:
           value: "/config/tools.yaml"
         - name: WORKER_PULL_POLICY
           value: "{{ default "Always" $ctl.workerPullPolicy }}"
+        - name: RESTRICTED_SECURITY_CONTEXT
+          value: "{{ default false $ctl.restrictedSecurityContext }}"
         - name: ONEDATA_ENABLED
           value: "{{ $ctl.onedata.enabled }}"
         - name: ONECLIENT_IMAGE

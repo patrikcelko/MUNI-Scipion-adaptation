@@ -11,11 +11,11 @@ NC='\033[0m'
 BOLD='\033[1m'
 
 info() {
-    echo -e "${CYAN}[INFO ]${NC} $*";
+    echo -e "${CYAN}[INFO]${NC} $*";
 }
 
 warn() {
-    echo -e "${YELLOW}[WARN ]${NC} $*";
+    echo -e "${YELLOW}[WARN]${NC} $*";
 }
 
 err() {

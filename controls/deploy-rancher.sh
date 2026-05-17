@@ -56,7 +56,7 @@ check_tools() {
     [[ -n "${KUBECONFIG:-}" || -f "$HOME/.kube/config" ]] \
         || err 'No KUBECONFIG set and ~/.kube/config is missing!'
 
-    kubectl cluster-info >/dev/null 2>&1 \
+    kubectl version --request-timeout=5s >/dev/null 2>&1 \
         || err 'Cannot reach Kubernetes API!'
 
     [[ -f "$VALUES_BASE"  ]] || err "Missing Helm values file: $VALUES_BASE"
@@ -72,8 +72,8 @@ print_deploy_summary() {
     info "  Namespace: $NAMESPACE"
 
     [[ -n "$INGRESS_HOST" ]] \
-        && info "  noVNC URL : http://${INGRESS_HOST}/vnc.html"
-    info "  VNC pass  : $VNC_PASSWORD"
+        && info "  noVNC URL: http://${INGRESS_HOST}/vnc.html"
+    info "  VNC password: $VNC_PASSWORD"
 }
 
 # Do a Helm upgrade/install of the Scipion release.
@@ -102,7 +102,13 @@ do_deploy() {
         --wait --timeout 10m
     )
 
-    [[ -n "$INGRESS_HOST" ]] && helm_args+=( --set "ingress.host=${INGRESS_HOST}" )
+    # Auto-generate host from release+namespace if not set explicitly
+    # Pattern used by CERIT Rancher: <release>.<namespace>.dyn.cloud.e-infra.cz
+    if [[ -z "$INGRESS_HOST" ]]; then
+        INGRESS_HOST="${RELEASE}.${NAMESPACE}.dyn.cloud.e-infra.cz"
+        info "No INGRESS_HOST set, using: $INGRESS_HOST"
+    fi
+    helm_args+=( --set "ingress.host=${INGRESS_HOST}" )
 
     # Append any OneData overrides
     helm_args+=( "${onedata_args[@]+"${onedata_args[@]}"}" )

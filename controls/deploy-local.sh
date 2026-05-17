@@ -100,13 +100,13 @@ print_deploy_summary() {
 
     echo ''
     info "Scipion local deployment complete:"
-    info "  Release      : $RELEASE"
-    info "  Namespace    : $NAMESPACE"
-    info "  Cluster type : $CLUSTER_TYPE"
+    info "  Release: $RELEASE"
+    info "  Namespace: $NAMESPACE"
+    info "  Cluster type: $CLUSTER_TYPE"
     info "  Storage class: $STORAGE_CLASS"
-    info "  noVNC URL    : http://${node_ip}:${NODE_PORT_GUI}/vnc.html"
-    info "  Controller   : http://${node_ip}:${NODE_PORT_CTRL}/docs"
-    info "  VNC password : $VNC_PASSWORD"
+    info "  noVNC URL: http://${node_ip}:${NODE_PORT_GUI}/vnc.html"
+    info "  Controller: http://${node_ip}:${NODE_PORT_CTRL}/docs"
+    info "  VNC password: $VNC_PASSWORD"
 }
 
 # Create the .mount_projects/ host directory used by microk8s hostpath PVs.
@@ -162,10 +162,10 @@ do_deploy() {
     helm_args+=( "${onedata_args[@]+"${onedata_args[@]}"}" )
 
     info "Deploying release '$RELEASE' into namespace '$NAMESPACE':"
-    info "  Cluster type  : ${CLUSTER_TYPE}"
-    info "  GUI image tag : ${GUI_IMAGE_TAG}"
+    info "  Cluster type: ${CLUSTER_TYPE}"
+    info "  GUI image tag: ${GUI_IMAGE_TAG}"
     info "  Controller tag: ${CTRL_IMAGE_TAG}"
-    info "  Storage class : ${STORAGE_CLASS}"
+    info "  Storage class: ${STORAGE_CLASS}"
 
     helm "${helm_args[@]}"
 

@@ -1,4 +1,4 @@
-{{- if .Values.ingress.enabled }}
+{{- if and .Values.ingress.enabled .Values.ingress.host }}
 {{- $fullname := include "scipion3-remote.fullname" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -32,11 +32,11 @@ spec:
                   {{- else }}
                   number: {{ .Values.service.port }}
                   {{- end }}
-  {{- if .Values.ingress.tls.enabled }}
+  {{- if and .Values.ingress.tls.enabled .Values.ingress.host }}
   tls:
     - hosts:
         - {{ .Values.ingress.host | quote }}
-      secretName: {{ .Values.ingress.tls.secretName | quote }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" $fullname) | quote }}
   {{- end }}
 {{- end }}
 

@@ -46,6 +46,16 @@ class K8sBackend(InfraBackend):
 
         resource_limits, resource_requests = self._build_resource_requirements(mem_mb, gpu)
 
+        tool_security_ctx: client.V1SecurityContext | None = None
+        if cfg.restricted_security_context:
+            tool_security_ctx = client.V1SecurityContext(
+                allow_privilege_escalation=False,
+                run_as_non_root=True,
+                run_as_user=1000,
+                capabilities=client.V1Capabilities(drop=['ALL']),
+                seccomp_profile=client.V1SeccompProfile(type='RuntimeDefault'),
+            )
+
         main_container: client.V1Container = client.V1Container(
             name='tool',
             image=image,
@@ -57,6 +67,7 @@ class K8sBackend(InfraBackend):
                 limits=resource_limits,
                 requests=resource_requests,
             ),
+            security_context=tool_security_ctx,
         )
 
         containers: list[client.V1Container] = [main_container]

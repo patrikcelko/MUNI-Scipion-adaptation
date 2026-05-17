@@ -59,6 +59,10 @@ class Settings:
     # Worker pod image pull policy
     worker_pull_policy: str = 'Always'
 
+    # Apply restricted PodSecurity securityContext to tool Job pods
+    # (required for namespaces with restricted PodSecurity policy, e.g. CERIT Rancher)
+    restricted_security_context: bool = False
+
     # Backend
     backend: str = 'k8s'
 
@@ -162,6 +166,7 @@ def get_settings() -> Settings:
         oneclient_extra=_safe_json('ONECLIENT_EXTRA', [], list),
         toolmap_path=os.environ.get('TOOLMAP_PATH', '/config/tools.yaml'),
         worker_pull_policy=os.environ.get('WORKER_PULL_POLICY', 'Always'),
+        restricted_security_context=(os.environ.get('RESTRICTED_SECURITY_CONTEXT', 'false').lower() == 'true'),
         backend=os.environ.get('BACKEND', 'k8s'),
         dispatcher_url=os.environ.get('DISPATCHER_URL', ''),
         dispatcher_token=os.environ.get('DISPATCHER_TOKEN', ''),

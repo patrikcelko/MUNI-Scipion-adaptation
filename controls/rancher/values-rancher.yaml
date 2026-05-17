@@ -51,3 +51,4 @@ controller:
     limits:   { cpu: "2",    memory: "2Gi" }
 
   storageMode: "pvc"
+  restrictedSecurityContext: true
