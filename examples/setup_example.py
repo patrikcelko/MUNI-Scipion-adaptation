@@ -83,6 +83,12 @@ EXAMPLE_PROJECTS: list[ExampleProject] = [
         enabled=True,
     ),
     ExampleProject(
+        name='Example_Extended3D',
+        pipeline_json='pipeline_B_extended_3d.json',
+        description='Extended 3D pipeline with additional refinement steps',
+        enabled=True,
+    ),
+    ExampleProject(
         name='Example_AlternativeSPA',
         pipeline_json='pipeline_C_alternative.json',
         description='Alternative SPA (9 steps): preprocessing -> CTF -> picking -> extract -> CL2D',

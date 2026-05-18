@@ -28,7 +28,7 @@
   needsGpu: true
   enabled: false
 
-# CTFFind (Cistem suite)
+# CTFFind (CisTEM suite)
 - protocol: "Cistem|.*CTFFind"
   match: "^ctffind4(\\b|_)"
   image: cerit.io/scipion/ctffind4:latest
@@ -44,12 +44,14 @@
 
 # EMAN2
 - protocol: "Eman"
+  match: "^e2.*"
   image: cerit.io/scipion/eman2:latest
   needsGpu: false
   enabled: false
 
 # Scipion framework (+ unmatched protocols)
-- match: "^python3.*"
+- protocol: ".*"
+  match: "^python3.*"
   image: cerit.io/scipion/scipion3-remote:latest
   needsGpu: false
   default: true

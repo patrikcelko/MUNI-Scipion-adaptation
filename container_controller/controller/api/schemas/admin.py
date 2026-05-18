@@ -32,7 +32,7 @@ class CleanupStatusResponse(BaseModel):
         ...,
         description='How often the cleanup thread runs, in seconds.',
     )
-    """Mirrors `Settings.jobs_cleanup_interval` (typically 60 s)."""
+    """Mirrors `Settings.jobs_cleanup_interval` (typically 120 s)."""
 
     known_jobs: int = Field(
         ...,
