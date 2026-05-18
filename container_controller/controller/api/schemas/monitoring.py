@@ -140,7 +140,8 @@ class JobInfo(BaseModel):
         description='Computed phase: RUNNING, DONE, or FAILED.',
     )
     """DONE when `succeeded >= 1`; FAILED when `failed >= 1` and
-    no active pods; RUNNING otherwise."""
+    no active pods; RUNNING otherwise.
+    """
 
     age: str = Field(
         ...,
@@ -215,7 +216,8 @@ class EventInfo(BaseModel):
         description='Human-readable age of the event.',
     )
     """Based on `last_timestamp`, `event_time`, or
-    `creation_timestamp` (first available)."""
+    `creation_timestamp` (first available).
+    """
 
 
 class EventListResponse(BaseModel):

@@ -66,11 +66,6 @@ class Settings:
     # Backend
     backend: str = 'k8s'
 
-    # Dispatcher backend settings
-    dispatcher_url: str = ''
-    dispatcher_token: str = ''
-    dispatcher_timeout: int = 30
-
     # Server
     port: int = 5000
 
@@ -168,8 +163,5 @@ def get_settings() -> Settings:
         worker_pull_policy=os.environ.get('WORKER_PULL_POLICY', 'Always'),
         restricted_security_context=(os.environ.get('RESTRICTED_SECURITY_CONTEXT', 'false').lower() == 'true'),
         backend=os.environ.get('BACKEND', 'k8s'),
-        dispatcher_url=os.environ.get('DISPATCHER_URL', ''),
-        dispatcher_token=os.environ.get('DISPATCHER_TOKEN', ''),
-        dispatcher_timeout=max(1, _safe_int('DISPATCHER_TIMEOUT', 30)),
         port=max(1, min(65535, _safe_int('PORT', 5000))),
     )

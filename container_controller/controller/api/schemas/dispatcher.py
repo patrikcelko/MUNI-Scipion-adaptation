@@ -14,7 +14,8 @@ class ImportWorkflowResponse(BaseModel):
         description='Always `True` on success (errors use JSONResponse).',
     )
     """On failure the endpoint returns a plain `JSONResponse` with
-    `ok=False` and an `error` field instead of this model."""
+    `ok=False` and an `error` field instead of this model.
+    """
 
     project_name: str = Field(
         ...,
@@ -34,9 +35,18 @@ class ImportWorkflowResponse(BaseModel):
     )
     """Pattern: `{base}/.dispatcher_workflows/{project_name}.json`."""
 
+    inputs_path: str | None = Field(
+        default=None,
+        description='Absolute path where input_files metadata was saved, or null if none provided.',
+    )
+    """Pattern: `{base}/.dispatcher_workflows/{project_name}_inputs.json`. Null when
+    the request contained no `input_files` list.
+    """
+
     vnc_url: str = Field(
         ...,
         description='HTTP URL for VNC GUI access to the Scipion desktop.',
     )
-    """Format: `http://{host}:{port}/vnc.html` (host/port from env or
-    request headers)."""
+    """Format: `http://{host}:{port}/vnc.html`. Host and port come exclusively
+    from the `VNC_HOST` / `VNC_PORT` environment variables
+    """

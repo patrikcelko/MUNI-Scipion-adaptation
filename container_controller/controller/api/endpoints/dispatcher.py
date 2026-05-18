@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -86,23 +86,11 @@ def _fetch_workflow_json(workflow_url: str) -> list[Any] | JSONResponse:
             status_code=400,
         )
 
-    ip_str = f'[{resolved_ip}]' if ':' in resolved_ip else resolved_ip
-    port_part = f':{parsed.port}' if parsed.port else ''
-
-    safe_url = urlunparse(
-        (
-            parsed.scheme,
-            f'{ip_str}{port_part}',
-            parsed.path,
-            parsed.params,
-            parsed.query,
-            parsed.fragment,
-        )
-    )
+    # Use the original URL (preserving hostname) so that SSL certificate
+    # verification succeeds via SNI.
     try:
-        req = urllib.request.Request(safe_url, method='GET')
+        req = urllib.request.Request(workflow_url, method='GET')
         req.add_header('User-Agent', 'Scipion-Controller/1.0')
-        req.add_header('Host', parsed.hostname)  # required for SNI / virtual hosting
         with urllib.request.urlopen(req, timeout=30) as resp:
             raw: str = resp.read(_MAX_WORKFLOW_BYTES + 1).decode('utf-8')
 
@@ -149,6 +137,7 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
         )
 
     project_name: str = re.sub(r'[^A-Za-z0-9_-]', '_', data.get('project_name', 'DispatcherProject'))[:64]
+    input_files: list[Any] | None = data.get('input_files') or None
 
     result = await asyncio.to_thread(_fetch_workflow_json, workflow_url)
     if isinstance(result, JSONResponse):
@@ -160,11 +149,16 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
     base_path: Path = Path('/projects' if cfg.storage_mode == 'pvc' else cfg.local_path)
     workflows_dir: Path = base_path / '.dispatcher_workflows'
     workflow_path: Path = workflows_dir / f'{project_name}.json'
+    inputs_path: Path | None = workflows_dir / f'{project_name}_inputs.json' if input_files else None
 
     def _persist() -> None:
         workflows_dir.mkdir(parents=True, exist_ok=True)
         with workflow_path.open('x', encoding='utf-8') as fh:
             json.dump(workflow_json, fh)
+
+        if inputs_path is not None:
+            with inputs_path.open('w', encoding='utf-8') as fh:
+                json.dump(input_files, fh)
 
     try:
         await asyncio.to_thread(_persist)
@@ -180,6 +174,12 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
         len(workflow_json),
         workflow_url,
     )
+    if inputs_path is not None:
+        logger.info(
+            'Saved %d input_files metadata entries to %s',
+            len(input_files),  # type: ignore[arg-type]
+            inputs_path,
+        )
 
     # VNC_HOST should be set via Helm / env var. Do NOT fall back to the
     # user-controlled Host request header, that would allow a Host-header
@@ -192,5 +192,6 @@ async def import_workflow(request: Request) -> dict[str, Any] | JSONResponse:
         'project_name': project_name,
         'protocols_count': len(workflow_json),
         'workflow_path': str(workflow_path),
+        'inputs_path': str(inputs_path) if inputs_path else None,
         'vnc_url': f'http://{vnc_host}:{vnc_port}/vnc.html',
     }

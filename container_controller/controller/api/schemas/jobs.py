@@ -36,7 +36,8 @@ class CancelResponse(BaseModel):
         description='Error message when ok is `False`.',
     )
     """Contains the exception text (e.g. `'invalid job id'`), or
-    `None` on success."""
+    `None` on success.
+    """
 
 
 class ErrorResponse(BaseModel):

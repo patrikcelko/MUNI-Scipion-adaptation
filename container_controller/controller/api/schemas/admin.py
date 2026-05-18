@@ -26,7 +26,8 @@ class CleanupStatusResponse(BaseModel):
         description='Cap on finished jobs kept, -1 means unlimited.',
     )
     """When the count exceeds this cap the oldest finished jobs are
-    forcibly deleted regardless of age."""
+    forcibly deleted regardless of age.
+    """
 
     check_interval: int = Field(
         ...,
